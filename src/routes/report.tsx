@@ -1,10 +1,39 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
-import { useState } from "react";
-import { Camera, Mic, Wifi, WifiOff, AlertTriangle, ShieldAlert, FileText, Send, LocateFixed } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, Mic, Wifi, WifiOff, AlertTriangle, ShieldAlert, FileText, Send, LocateFixed, X, Square } from "lucide-react";
 import { store, type AnimalIncident, type RiskLevel } from "@/lib/store";
 import { requestApproxLocation, type ApproxLocation } from "@/lib/location";
+import { analyzeIncidentImageWithGemma, summarizeVoiceNoteWithGemma } from "@/lib/gemma";
 import { toast } from "sonner";
+
+type BrowserSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: { error?: string; message?: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: ArrayLike<{
+    isFinal: boolean;
+    0: { transcript: string };
+  }>;
+};
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+declare global {
+  interface Window {
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    SpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
 
 export const Route = createFileRoute("/report")({
   head: () => ({
@@ -34,16 +63,50 @@ const INCIDENTS = [
 
 function Report() {
   const nav = useNavigate();
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const [species, setSpecies] = useState<AnimalIncident["species"]>("cattle");
   const [incident, setIncident] = useState<AnimalIncident["incident"]>("sudden-sickness");
   const [notes, setNotes] = useState("");
   const [zip, setZip] = useState("85629");
   const [offline, setOffline] = useState(false);
-  const [hasPhoto, setHasPhoto] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | undefined>();
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | undefined>();
+  const [photoAnalysis, setPhotoAnalysis] = useState("");
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceSummary, setVoiceSummary] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const [approxLocation, setApproxLocation] = useState<ApproxLocation | undefined>();
   const [locating, setLocating] = useState(false);
 
   const triage = computeTriage(incident, species);
+
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreviewUrl(undefined);
+      setPhotoAnalysis("");
+      return;
+    }
+
+    const url = URL.createObjectURL(photoFile);
+    setPhotoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
+
+  useEffect(() => {
+    if (!photoFile) return;
+
+    let cancelled = false;
+    analyzeIncidentImageWithGemma(photoFile, { incident, species }).then((analysis) => {
+      if (!cancelled) setPhotoAnalysis(analysis);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [photoFile, incident, species]);
+
+  useEffect(() => () => recognitionRef.current?.stop(), []);
 
   const captureLocation = async () => {
     setLocating(true);
@@ -65,10 +128,66 @@ function Report() {
       zip, species, incident, notes,
       urgency: triage.urgency,
       approxLocation,
+      photo: photoFile
+        ? { name: photoFile.name, type: photoFile.type, size: photoFile.size }
+        : undefined,
+      photoAnalysis: photoAnalysis || undefined,
+      voiceTranscript: voiceTranscript || undefined,
+      voiceSummary: voiceSummary || undefined,
     };
     store.addIncident(ai);
     toast.success(offline ? "Saved offline — will sync when connected" : "Shared with VetLink Network");
     setTimeout(() => nav({ to: "/map" }), 500);
+  };
+
+  const toggleVoiceNote = () => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!Recognition) {
+      toast.error("Voice notes are not supported in this browser.");
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i += 1) {
+        transcript += event.results[i][0].transcript;
+      }
+      setVoiceTranscript(transcript.trim());
+    };
+    recognition.onerror = (event) => {
+      setIsRecording(false);
+      toast.error(event.message || event.error || "Could not record voice note");
+    };
+    recognition.onend = () => setIsRecording(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+  };
+
+  const summarizeVoiceNote = async () => {
+    if (!voiceTranscript.trim()) {
+      toast.error("Record a voice note first");
+      return;
+    }
+
+    setIsSummarizing(true);
+    try {
+      const summary = await summarizeVoiceNoteWithGemma(voiceTranscript, { incident, species });
+      setVoiceSummary(summary);
+      toast.success("Gemma summary ready");
+    } finally {
+      setIsSummarizing(false);
+    }
   };
 
   return (
@@ -86,11 +205,59 @@ function Report() {
 
       <section className="px-5 mt-5">
         <p className="text-[15px] font-bold text-navy">Visual Evidence</p>
-        <button onClick={() => setHasPhoto(true)} className={`mt-2 w-full rounded-2xl border-2 border-dashed py-8 grid place-items-center transition-colors ${hasPhoto ? "border-success bg-success/5" : "border-border bg-surface"}`}>
-          <Camera className={`w-7 h-7 ${hasPhoto ? "text-success" : "text-muted-foreground"}`} />
-          <p className="mt-2 text-[13px] font-semibold text-navy">{hasPhoto ? "Photo attached" : "Tap to capture or upload"}</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">High-resolution images improve AI analysis</p>
-        </button>
+        <label className={`mt-2 block w-full overflow-hidden rounded-2xl border-2 border-dashed transition-colors ${photoFile ? "border-success bg-success/5" : "border-border bg-surface"}`}>
+          <input
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              if (!file.type.startsWith("image/")) {
+                toast.error("Please choose an image file");
+                return;
+              }
+              setPhotoFile(file);
+            }}
+          />
+          {photoPreviewUrl ? (
+            <div className="relative">
+              <img src={photoPreviewUrl} alt="Incident evidence preview" className="h-48 w-full object-cover" />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setPhotoFile(undefined);
+                }}
+                className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/55 text-white backdrop-blur"
+                aria-label="Remove photo"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="grid place-items-center px-4 py-8">
+              <Camera className="w-7 h-7 text-muted-foreground" />
+              <p className="mt-2 text-[13px] font-semibold text-navy">Tap to take or choose a photo</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">On iPhone, choose camera or photo library</p>
+            </div>
+          )}
+          {photoFile ? (
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold text-navy">{photoFile.name || "Photo attached"}</p>
+                <p className="text-[11px] text-muted-foreground">{formatFileSize(photoFile.size)}</p>
+              </div>
+              <span className="shrink-0 text-[11px] font-bold text-success">Attached</span>
+            </div>
+          ) : null}
+        </label>
+        {photoAnalysis ? (
+          <div className="mt-2 rounded-xl border border-teal/20 bg-teal/5 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-teal">Gemma Image Analysis</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-navy">{photoAnalysis}</p>
+          </div>
+        ) : null}
       </section>
 
       <section className="px-5 mt-5">
@@ -123,11 +290,44 @@ function Report() {
             );
           })}
         </div>
-        <button className="mt-2 w-full flex items-center gap-3 rounded-xl border border-border bg-gradient-success/10 bg-success/5 px-4 py-3">
-          <Mic className="w-4 h-4 text-success"/>
-          <span className="text-[13px] font-semibold text-navy flex-1 text-left">Record Voice Note</span>
-          <span className="text-[11px] text-muted-foreground">00:00</span>
+        <button onClick={toggleVoiceNote} className={`mt-2 w-full flex items-center gap-3 rounded-xl border px-4 py-3 ${isRecording ? "border-danger bg-danger/8" : "border-border bg-success/5"}`}>
+          {isRecording ? <Square className="w-4 h-4 text-danger"/> : <Mic className="w-4 h-4 text-success"/>}
+          <span className="text-[13px] font-semibold text-navy flex-1 text-left">{isRecording ? "Stop Voice Note" : "Record Voice Note"}</span>
+          <span className={`text-[11px] font-semibold ${isRecording ? "text-danger" : "text-muted-foreground"}`}>{isRecording ? "Listening" : "Tap to start"}</span>
         </button>
+        {voiceTranscript ? (
+          <div className="mt-2 rounded-xl border border-border bg-card p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Transcript</p>
+              <button type="button" onClick={() => { setVoiceTranscript(""); setVoiceSummary(""); }} className="text-[11px] font-bold text-danger">Clear</button>
+            </div>
+            <p className="mt-1 text-[12px] leading-relaxed text-navy">{voiceTranscript}</p>
+            <button
+              type="button"
+              onClick={summarizeVoiceNote}
+              disabled={isSummarizing}
+              className="mt-3 w-full rounded-lg bg-teal px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-70"
+            >
+              {isSummarizing ? "Summarizing..." : "Summarize with Gemma"}
+            </button>
+          </div>
+        ) : null}
+        {voiceSummary ? (
+          <div className="mt-2 rounded-xl border border-warning/25 bg-warning/10 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-warning">Gemma Voice Summary</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-navy">{voiceSummary}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setNotes(voiceSummary);
+                toast.success("Summary added to notes");
+              }}
+              className="mt-3 w-full rounded-lg bg-navy px-3 py-2 text-[12px] font-semibold text-white"
+            >
+              Use Summary Instead
+            </button>
+          </div>
+        ) : null}
         <textarea value={notes} onChange={(e)=>setNotes(e.target.value)} rows={3} placeholder="Add notes about behavior, location, time observed…" className="mt-2 w-full rounded-xl bg-card border border-border p-3 text-[13px] focus:outline-none focus:border-teal"/>
         <input value={zip} onChange={(e)=>setZip(e.target.value.replace(/\D/g,"").slice(0,5))} className="mt-2 w-full rounded-xl bg-card border border-border p-3 text-[13px] font-semibold text-navy focus:outline-none focus:border-teal" placeholder="ZIP" inputMode="numeric"/>
         <button
@@ -150,7 +350,7 @@ function Report() {
         <div className="rounded-2xl bg-gradient-dark-card text-white p-4 shadow-elevated">
           <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider opacity-90">
             <span className="w-5 h-5 rounded-full bg-teal/30 grid place-items-center text-[10px]">AI</span>
-            AI Triage Profile
+            Gemma Triage Profile
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
@@ -164,7 +364,7 @@ function Report() {
           </div>
           <div className="mt-3">
             <p className="text-[10px] uppercase font-bold tracking-wider opacity-70">Analysis Summary</p>
-            <p className="mt-1 text-[12px] opacity-90 leading-relaxed">{triage.summary}</p>
+            <p className="mt-1 text-[12px] opacity-90 leading-relaxed">{[triage.summary, photoAnalysis, voiceSummary].filter(Boolean).join(" ")}</p>
           </div>
           <ul className="mt-3 space-y-1 text-[12px] opacity-90">
             {triage.next.map((n) => (
@@ -189,6 +389,11 @@ function Report() {
       </p>
     </AppShell>
   );
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function computeTriage(incident: AnimalIncident["incident"], species: AnimalIncident["species"]) {

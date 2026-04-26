@@ -40,6 +40,14 @@ export type AnimalIncident = {
   notes: string;
   urgency: RiskLevel;
   approxLocation?: ApproxLocation;
+  photo?: {
+    name: string;
+    type: string;
+    size: number;
+  };
+  photoAnalysis?: string;
+  voiceTranscript?: string;
+  voiceSummary?: string;
 };
 
 export type DoctorReport = {
