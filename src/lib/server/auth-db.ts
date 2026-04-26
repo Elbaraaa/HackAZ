@@ -190,7 +190,16 @@ async function seedSystemAccounts(sql: SqlClient) {
 
   for (const account of seeded) {
     const existing = await sql`SELECT id FROM bloomy_users WHERE email = ${normalizeEmail(account.email)} LIMIT 1`;
-    if (existing.length) continue;
+    if (existing.length) {
+      await sql`
+        UPDATE bloomy_users
+        SET
+          share_data_anonymously = ${account.shareDataAnonymously ?? true},
+          open_to_follow_up = ${account.openToFollowUp ?? false}
+        WHERE email = ${normalizeEmail(account.email)}
+      `;
+      continue;
+    }
     await insertUser(sql, account, { forceApproved: true, approvedBy: "system" });
   }
 }
