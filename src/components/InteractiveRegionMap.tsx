@@ -88,8 +88,10 @@ export function InteractiveRegionMap({
         const details = document.createElement("p");
         details.textContent = `${signal.illness.replace("-", " ")} - ${signal.severity} - rank ${signal.rank}`;
         const expiry = document.createElement("p");
+        const reported = document.createElement("p");
+        reported.textContent = `Reported ${formatCaseDate(signal.createdAt)}`;
         expiry.textContent = `Expires ${new Date(signal.expiresAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric" })}`;
-        popupNode.append(title, details, expiry);
+        popupNode.append(title, details, reported, expiry);
 
         return new mapbox.default.Marker({ element: el })
           .setLngLat([signal.longitude, signal.latitude])
@@ -314,4 +316,13 @@ function toRadians(value: number) {
 
 function toDegrees(value: number) {
   return value * 180 / Math.PI;
+}
+
+function formatCaseDate(value: string) {
+  return new Date(value).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }

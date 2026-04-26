@@ -150,6 +150,7 @@ function CompactSignalRow({ signal }: { signal: CommunitySignal }) {
         <p className="truncate text-[12px] font-bold text-navy">{signal.title}</p>
         <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
           <span className="text-muted-foreground">ZIP {signal.zip}</span>
+          <span className="text-muted-foreground">{formatCaseDate(signal.createdAt)}</span>
           <span className={tone}>{signal.severity}</span>
           <span className="text-danger">Rank {signal.rank}</span>
         </div>
@@ -207,4 +208,12 @@ function colorFor(s: CommunitySignal) {
   if (s.type === "heat") return "oklch(0.78 0.16 75)";
   if (s.severity === "high") return "oklch(0.62 0.22 25)";
   return "oklch(0.78 0.16 75)";
+}
+
+function formatCaseDate(value: string) {
+  return new Date(value).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+  });
 }

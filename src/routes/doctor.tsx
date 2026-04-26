@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { activeSignals, store, useStore } from "@/lib/store";
-import { Activity, Bell, Check, ChevronRight, X, AlertTriangle, TrendingUp, ClipboardCheck, ShieldAlert } from "lucide-react";
+import { Activity, Bell, Check, ChevronRight, X, AlertTriangle, TrendingUp, ClipboardCheck, ShieldAlert, CalendarDays, Image as ImageIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -124,11 +124,41 @@ function Doctor() {
                   <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">{c.detail}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wider">
                     <span className="rounded bg-muted px-1.5 py-0.5 text-navy">ZIP {c.zip}</span>
+                    <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-navy"><CalendarDays className="h-3 w-3" /> {formatCaseDate(c.createdAt)}</span>
                     <span className="text-teal">{c.illness.replace("-", " ")}</span>
                     <span className={c.severity === "high" ? "text-danger" : "text-warning"}>{c.severity}</span>
                   </div>
                 </div>
               </div>
+
+              {doctorType === "animal" && (c.evidencePhoto || c.photoAnalysis || c.voiceSummary) ? (
+                <div className="mt-3 rounded-xl border border-border bg-surface p-3">
+                  <p className="flex items-center gap-1.5 text-[12px] font-bold text-navy">
+                    <ImageIcon className="h-3.5 w-3.5 text-teal" /> Vet case evidence
+                  </p>
+                  {c.evidencePhoto?.previewUrl ? (
+                    <img
+                      src={c.evidencePhoto.previewUrl}
+                      alt="Animal incident evidence"
+                      className="mt-2 h-44 w-full rounded-lg object-cover"
+                    />
+                  ) : c.evidencePhoto ? (
+                    <p className="mt-2 text-[12px] text-muted-foreground">{c.evidencePhoto.name} attached</p>
+                  ) : null}
+                  {c.photoAnalysis ? (
+                    <div className="mt-2 rounded-lg bg-teal/5 p-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-teal">Gemma image analysis</p>
+                      <p className="mt-1 text-[12px] leading-relaxed text-navy">{c.photoAnalysis}</p>
+                    </div>
+                  ) : null}
+                  {c.voiceSummary ? (
+                    <div className="mt-2 rounded-lg bg-warning/10 p-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-warning">Voice note summary</p>
+                      <p className="mt-1 text-[12px] leading-relaxed text-navy">{c.voiceSummary}</p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <textarea
                 value={reports[c.id] ?? ""}
@@ -186,4 +216,13 @@ function defaultReport(action: "monitor" | "resolved" | "dismissed") {
   if (action === "monitor") return "Case reviewed. Symptoms may be contagious; keep on live map for continued surveillance.";
   if (action === "resolved") return "Patient or region appears recovered and non-contagious. Removed from live outbreak map.";
   return "Reviewed as non-actionable or duplicate signal. Removed from live outbreak map.";
+}
+
+function formatCaseDate(value: string) {
+  return new Date(value).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }

@@ -44,6 +44,7 @@ export type AnimalIncident = {
     name: string;
     type: string;
     size: number;
+    previewUrl?: string;
   };
   photoAnalysis?: string;
   voiceTranscript?: string;
@@ -75,6 +76,10 @@ export type CommunitySignal = {
   latitude: number;
   locationSource?: "zip" | "device";
   locationAccuracyMiles?: number;
+  evidencePhoto?: AnimalIncident["photo"];
+  photoAnalysis?: string;
+  voiceTranscript?: string;
+  voiceSummary?: string;
   // pseudo coords for the SVG fallback map (0-100 in a 320x240 viewBox)
   x: number;
   y: number;
@@ -312,6 +317,7 @@ export const store = {
         title: `New ${illness.replace("-", " ")} report near ${c.zip}`,
         detail: `${c.symptoms.length} symptom(s): ${symptomText.join(", ")}.`,
         ago: "just now",
+        createdAt: c.date,
         severity: initialSignalSeverity(c.risk, 1),
         x: devicePoint?.x ?? loc.x,
         y: devicePoint?.y ?? loc.y,
@@ -348,6 +354,7 @@ export const store = {
       title: `Animal incident reported (${i.species})`,
       detail: i.notes || "Awaiting veterinary review via VetLink Network.",
       ago: "just now",
+      createdAt: i.date,
       severity: initialSignalSeverity(i.urgency, 1),
       x: devicePoint?.x ?? loc.x,
       y: devicePoint?.y ?? loc.y,
@@ -355,6 +362,10 @@ export const store = {
       latitude: i.approxLocation?.latitude ?? loc.latitude,
       locationSource: i.approxLocation ? "device" : "zip",
       locationAccuracyMiles: i.approxLocation?.privacyRadiusMiles,
+      evidencePhoto: i.photo,
+      photoAnalysis: i.photoAnalysis,
+      voiceTranscript: i.voiceTranscript,
+      voiceSummary: i.voiceSummary,
       count: 1,
     });
     state = {

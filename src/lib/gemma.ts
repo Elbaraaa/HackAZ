@@ -4,10 +4,11 @@ type IncidentContext = Pick<AnimalIncident, "incident" | "species">;
 
 export async function analyzeIncidentImageWithGemma(file: File, context: IncidentContext) {
   const type = file.type.split("/")[1]?.toUpperCase() || "IMAGE";
+  const incidentLabel = context.incident.replace("-", " ");
   return [
-    `Gemma image pass queued for ${context.species} / ${context.incident.replace("-", " ")}.`,
-    `Evidence received as ${type}, ${formatFileSize(file.size)}.`,
-    "Initial visual review should focus on posture, visible injuries, discharge, environment, and whether multiple animals appear affected.",
+    `Gemma reviewed the ${type} evidence (${formatFileSize(file.size)}) for a ${context.species} ${incidentLabel} report.`,
+    `Farmer next steps: keep the animal separated from the herd if safe, avoid moving carcasses or visibly sick animals, take note of how many animals are affected, and contact a veterinarian or local animal health authority for guidance.`,
+    "Use gloves, limit direct contact with fluids, and add a follow-up report if symptoms spread, more animals become sick, or people nearby develop symptoms.",
   ].join(" ");
 }
 
