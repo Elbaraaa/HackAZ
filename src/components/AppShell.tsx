@@ -1,6 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Activity, Map as MapIcon, Stethoscope, Sparkles, Home } from "lucide-react";
 import { type ReactNode } from "react";
+import { AuthStatus } from "@/components/AuthStatus";
 
 const tabs = [
   { to: "/", label: "Home", icon: Home },
@@ -58,7 +59,7 @@ export function TopBar({
         <span className="text-sm font-semibold text-teal tracking-tight">{title}</span>
         {pill}
       </div>
-      {right}
+      {right ?? <AuthStatus />}
     </header>
   );
 }

@@ -15,7 +15,9 @@ import { Route as MapRouteImport } from './routes/map'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as DoctorRouteImport } from './routes/doctor'
 import { Route as CheckinRouteImport } from './routes/checkin'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiBackboardSessionRouteImport } from './routes/api/backboard.session'
 
 const ReportRoute = ReportRouteImport.update({
   id: '/report',
@@ -47,78 +49,102 @@ const CheckinRoute = CheckinRouteImport.update({
   path: '/checkin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBackboardSessionRoute = ApiBackboardSessionRouteImport.update({
+  id: '/api/backboard/session',
+  path: '/api/backboard/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/checkin': typeof CheckinRoute
   '/doctor': typeof DoctorRoute
   '/insights': typeof InsightsRoute
   '/map': typeof MapRoute
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
+  '/api/backboard/session': typeof ApiBackboardSessionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/checkin': typeof CheckinRoute
   '/doctor': typeof DoctorRoute
   '/insights': typeof InsightsRoute
   '/map': typeof MapRoute
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
+  '/api/backboard/session': typeof ApiBackboardSessionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/checkin': typeof CheckinRoute
   '/doctor': typeof DoctorRoute
   '/insights': typeof InsightsRoute
   '/map': typeof MapRoute
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
+  '/api/backboard/session': typeof ApiBackboardSessionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/checkin'
     | '/doctor'
     | '/insights'
     | '/map'
     | '/public-health'
     | '/report'
+    | '/api/backboard/session'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/checkin'
     | '/doctor'
     | '/insights'
     | '/map'
     | '/public-health'
     | '/report'
+    | '/api/backboard/session'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/checkin'
     | '/doctor'
     | '/insights'
     | '/map'
     | '/public-health'
     | '/report'
+    | '/api/backboard/session'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   CheckinRoute: typeof CheckinRoute
   DoctorRoute: typeof DoctorRoute
   InsightsRoute: typeof InsightsRoute
   MapRoute: typeof MapRoute
   PublicHealthRoute: typeof PublicHealthRoute
   ReportRoute: typeof ReportRoute
+  ApiBackboardSessionRoute: typeof ApiBackboardSessionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -165,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckinRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -172,17 +205,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/backboard/session': {
+      id: '/api/backboard/session'
+      path: '/api/backboard/session'
+      fullPath: '/api/backboard/session'
+      preLoaderRoute: typeof ApiBackboardSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   CheckinRoute: CheckinRoute,
   DoctorRoute: DoctorRoute,
   InsightsRoute: InsightsRoute,
   MapRoute: MapRoute,
   PublicHealthRoute: PublicHealthRoute,
   ReportRoute: ReportRoute,
+  ApiBackboardSessionRoute: ApiBackboardSessionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

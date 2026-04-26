@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
+import { useAppUser } from "@/hooks/use-app-user";
+import { getDoctorProfile } from "@/lib/app-data";
 import { useStore } from "@/lib/store";
 import { Activity, Bell, Check, ChevronRight, X, AlertTriangle, TrendingUp } from "lucide-react";
 import { useState } from "react";
@@ -23,6 +25,8 @@ const trend = Array.from({ length: 14 }).map((_, i) => ({
 }));
 
 function Doctor() {
+  const { isAuthenticated, role, profile, loginWithRedirect } = useAppUser();
+  const doctorProfile = getDoctorProfile(profile?.doctorProfileId);
   const signals = useStore((s) => s.signals);
   const [decisions, setDecisions] = useState<Record<string, "confirm" | "review" | "dismiss">>({});
 
@@ -44,8 +48,31 @@ function Doctor() {
 
       <section className="px-5 pt-2">
         <h1 className="text-3xl font-extrabold tracking-tight text-navy">Surveillance</h1>
-        <p className="text-[13px] text-muted-foreground mt-1">Regional demographic health monitoring and predictive insights.</p>
+        <p className="text-[13px] text-muted-foreground mt-1">
+          {doctorProfile
+            ? `${doctorProfile.displayName} · ${doctorProfile.specialty} · ${doctorProfile.organization}`
+            : "Regional demographic health monitoring and predictive insights."}
+        </p>
       </section>
+
+      {!isAuthenticated ? (
+        <section className="px-5 mt-4">
+          <div className="rounded-2xl bg-warning/10 border border-warning/30 p-4">
+            <p className="text-[13px] font-bold text-warning">Doctor login required</p>
+            <p className="mt-1 text-[12px] text-navy">Sign in with Auth0 before connecting this view to real patient data.</p>
+            <button onClick={() => loginWithRedirect()} className="mt-3 rounded-lg bg-navy px-3 py-2 text-[12px] font-semibold text-white">
+              Log in
+            </button>
+          </div>
+        </section>
+      ) : role !== "doctor" && role !== "admin" ? (
+        <section className="px-5 mt-4">
+          <div className="rounded-2xl bg-warning/10 border border-warning/30 p-4">
+            <p className="text-[13px] font-bold text-warning">Restricted clinical view</p>
+            <p className="mt-1 text-[12px] text-navy">Your Auth0 role is currently patient. Add a doctor/admin role before exposing patient data here.</p>
+          </div>
+        </section>
+      ) : null}
 
       <section className="px-5 mt-5">
         <div className="rounded-2xl bg-card border border-border p-4 shadow-soft">
