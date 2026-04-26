@@ -16,6 +16,14 @@ type AlexaSessionAttributes = {
 export const Route = createFileRoute("/api/alexa")({
   server: {
     handlers: {
+      GET: async () => {
+        return Response.json({
+          ok: true,
+          service: "Bloomy Alexa webhook",
+          gemmaConfigured: Boolean(process.env.GEMINI_API_KEY),
+          expectedEndpoint: "https://www.bloomy.health/api/alexa",
+        });
+      },
       POST: async ({ request }) => {
         // Alexa skill webhooks are called server-to-server and must remain publicly accessible:
         // do not require cookies, sessions, login, or CSRF tokens on this route.
@@ -67,6 +75,14 @@ async function handleAlexaRequest(body: any) {
     return buildAlexaResponse(helpForStep(sessionAttributes.step), false, sessionAttributes);
   }
 
+  if (intentName === "DebugIntent") {
+    return handleDebugIntent();
+  }
+
+  if (intentName === "CheckInIntent" || intentName === "OneShotCheckInIntent") {
+    return handleOneShotCheckIn(spokenText);
+  }
+
   if (intentName === "FeelingIntent" || sessionAttributes.step === "ASK_FEELING") {
     return handleFeeling(spokenText);
   }
@@ -84,6 +100,70 @@ async function handleAlexaRequest(body: any) {
   }
 
   return buildAlexaResponse(FALLBACK_TEXT, false, { step: "ASK_FEELING" }, "How are you feeling today?");
+}
+
+async function handleDebugIntent() {
+  if (!process.env.GEMINI_API_KEY) {
+    return buildAlexaResponse(
+      "Bloomy is reachable, but Gemma is not configured on this deployment.",
+      true,
+      {},
+    );
+  }
+
+  const ai = await getAiSummary({
+    userId: DEMO_USER_ID,
+    feeling: "sick",
+    symptoms: ["debug cough"],
+    source: "alexa",
+    dailyCheckInComplete: false,
+  });
+
+  return buildAlexaResponse(
+    ai ? "Bloomy is reachable and Gemma responded successfully." : "Bloomy is reachable, but Gemma did not respond successfully.",
+    true,
+    {},
+  );
+}
+
+async function handleOneShotCheckIn(spokenText: string) {
+  const feeling = classifyFeeling(spokenText);
+  const symptoms = extractSymptomsFromText(spokenText);
+  const impact = extractImpactFromText(spokenText);
+  const gathering = /gathering|party|event|meeting|crowd|crowded|school|work|class/i.test(spokenText)
+    ? true
+    : classifyYesNo(spokenText);
+
+  const checkIn: HealthCheckInInput = {
+    userId: DEMO_USER_ID,
+    feeling: feeling === "well" ? "good" : symptoms.length || feeling === "not_well" ? "sick" : "unsure",
+    symptoms,
+    massGathering: gathering,
+    source: "alexa",
+    dailyCheckInComplete: true,
+    summary: impact ? `Impact reported: ${impact}` : undefined,
+  };
+
+  const ai = await getAiSummary(checkIn);
+  await persistCheckIn({
+    ...checkIn,
+    summary: ai?.summary ?? checkIn.summary,
+    nextSteps: ai?.nextSteps,
+  });
+
+  if (ai?.summary && ai.nextSteps) {
+    return buildAlexaResponse(
+      `Checked in with Bloomy. ${ai.summary}. Next steps: ${ai.nextSteps}.`,
+      true,
+      {},
+    );
+  }
+
+  return buildAlexaResponse(
+    "Checked in with Bloomy. I saved your report, but Gemma did not return guidance this time.",
+    true,
+    {},
+  );
 }
 
 function handleFeeling(spokenText: string) {
@@ -308,6 +388,43 @@ function getSpokenText(body: any) {
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .join(" ")
     .trim();
+}
+
+function extractSymptomsFromText(text: string) {
+  const value = normalize(text);
+  const symptoms = [
+    "cough",
+    "congestion",
+    "fever",
+    "chills",
+    "nausea",
+    "vomiting",
+    "diarrhea",
+    "rash",
+    "sore throat",
+    "difficulty breathing",
+    "shortness of breath",
+    "body aches",
+    "headache",
+    "red eyes",
+    "loss of smell",
+    "loss of taste",
+    "yellow skin",
+    "yellow eyes",
+  ].filter((symptom) => value.includes(symptom));
+
+  if (symptoms.length) return symptoms;
+  if (classifyFeeling(text) === "not_well") return [text.trim() || "unspecified symptoms"];
+  return [];
+}
+
+function extractImpactFromText(text: string) {
+  const impacts = [
+    /\babsent from work\b/i.test(text) ? "absent from work" : "",
+    /\babsent from school\b/i.test(text) ? "absent from school" : "",
+    /\b(seek|sought|visited|went to).*(doctor|clinic|care|treatment)\b/i.test(text) ? "sought healthcare or treatment" : "",
+  ].filter(Boolean);
+  return impacts.join(", ");
 }
 
 function readSessionAttributes(body: any): AlexaSessionAttributes {
