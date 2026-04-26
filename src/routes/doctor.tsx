@@ -1,17 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
-import { useAppUser } from "@/hooks/use-app-user";
-import { getDoctorProfile } from "@/lib/app-data";
-import { useStore } from "@/lib/store";
-import { Activity, Bell, Check, ChevronRight, X, AlertTriangle, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { activeSignals, store, useStore } from "@/lib/store";
+import { Activity, Bell, Check, ChevronRight, X, AlertTriangle, TrendingUp, ClipboardCheck, ShieldAlert } from "lucide-react";
+import { useMemo, useState } from "react";
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/doctor")({
   head: () => ({
     meta: [
-      { title: "Doctor Dashboard — OutbreakIQ" },
+      { title: "Doctor Dashboard - OutbreakIQ" },
       { name: "description", content: "Validate community alerts with one tap." },
     ],
   }),
@@ -25,54 +23,34 @@ const trend = Array.from({ length: 14 }).map((_, i) => ({
 }));
 
 function Doctor() {
-  const { isAuthenticated, role, profile, loginWithRedirect } = useAppUser();
-  const doctorProfile = getDoctorProfile(profile?.doctorProfileId);
   const signals = useStore((s) => s.signals);
-  const [decisions, setDecisions] = useState<Record<string, "confirm" | "review" | "dismiss">>({});
+  const liveSignals = useMemo(() => activeSignals(signals), [signals]);
+  const [reports, setReports] = useState<Record<string, string>>({});
 
-  const decide = (id: string, d: "confirm" | "review" | "dismiss") => {
-    setDecisions((p) => ({ ...p, [id]: d }));
-    toast.success(`Marked as ${d}`);
+  const clusters = liveSignals.filter((s) => s.type === "symptom-cluster" || s.type === "animal" || s.type === "mosquito" || s.type === "heat");
+  const highRisk = clusters.filter((s) => s.severity === "high").length;
+
+  const decide = (id: string, action: "monitor" | "resolved" | "dismissed", contagious: boolean) => {
+    const summary = reports[id]?.trim() || defaultReport(action);
+    store.doctorReviewSignal(id, { action, contagious, summary, reviewer: "Dr. Sentinel" });
+    toast.success(action === "monitor" ? "Case note saved" : "Case removed from live map");
   };
-
-  const clusters = signals.filter((s) => s.type === "symptom-cluster" || s.type === "animal");
 
   return (
     <AppShell>
-      <TopBar title="Clinical Intel" back="/" pill={<StatusPill tone="live">Verified MD</StatusPill>} right={
+      <TopBar title="Clinical Intel" back="/" pill={<StatusPill tone="live">Doctor Mode</StatusPill>} right={
         <button className="w-9 h-9 rounded-full grid place-items-center bg-muted relative">
           <Bell className="w-4 h-4"/>
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger"/>
+          {highRisk ? <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger"/> : null}
         </button>
       }/>
 
       <section className="px-5 pt-2">
         <h1 className="text-3xl font-extrabold tracking-tight text-navy">Surveillance</h1>
         <p className="text-[13px] text-muted-foreground mt-1">
-          {doctorProfile
-            ? `${doctorProfile.displayName} · ${doctorProfile.specialty} · ${doctorProfile.organization}`
-            : "Regional demographic health monitoring and predictive insights."}
+          Doctor review queue for live regional cases. Auth0 is disabled, so this dashboard is open in the demo.
         </p>
       </section>
-
-      {!isAuthenticated ? (
-        <section className="px-5 mt-4">
-          <div className="rounded-2xl bg-warning/10 border border-warning/30 p-4">
-            <p className="text-[13px] font-bold text-warning">Doctor login required</p>
-            <p className="mt-1 text-[12px] text-navy">Sign in with Auth0 before connecting this view to real patient data.</p>
-            <button onClick={() => loginWithRedirect()} className="mt-3 rounded-lg bg-navy px-3 py-2 text-[12px] font-semibold text-white">
-              Log in
-            </button>
-          </div>
-        </section>
-      ) : role !== "doctor" && role !== "admin" ? (
-        <section className="px-5 mt-4">
-          <div className="rounded-2xl bg-warning/10 border border-warning/30 p-4">
-            <p className="text-[13px] font-bold text-warning">Restricted clinical view</p>
-            <p className="mt-1 text-[12px] text-navy">Your Auth0 role is currently patient. Add a doctor/admin role before exposing patient data here.</p>
-          </div>
-        </section>
-      ) : null}
 
       <section className="px-5 mt-5">
         <div className="rounded-2xl bg-card border border-border p-4 shadow-soft">
@@ -94,43 +72,67 @@ function Doctor() {
         </div>
       </section>
 
-      <section className="px-5 mt-4">
-        <div className="rounded-2xl bg-gradient-dark-card text-white p-5 shadow-elevated">
+      <section className="px-5 mt-4 grid grid-cols-2 gap-3">
+        <div className="rounded-2xl bg-gradient-dark-card text-white p-4 shadow-elevated">
           <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">48h Demand Forecast</p>
-          <p className="mt-1 text-4xl font-extrabold">High</p>
-          <p className="mt-1 text-[12px] opacity-80 leading-relaxed">Likely clinic demand based on current symptom clusters and historical data.</p>
-          <p className="mt-2 text-[10px] uppercase tracking-wider opacity-60">Confidence Level <span className="text-success">92% Â· Wide</span></p>
+          <p className="mt-1 text-3xl font-extrabold">{highRisk ? "High" : "Moderate"}</p>
+          <p className="mt-1 text-[11px] opacity-80 leading-relaxed">Based on live symptom clusters and environmental signals.</p>
+        </div>
+        <div className="rounded-2xl bg-card border border-border p-4 shadow-soft">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Review Queue</p>
+          <p className="mt-1 text-3xl font-extrabold text-navy">{clusters.length}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{highRisk} high-risk case{highRisk === 1 ? "" : "s"}</p>
         </div>
       </section>
 
       <section className="px-5 mt-5">
-        <p className="text-[15px] font-bold text-navy">Active Intelligence Clusters</p>
+        <p className="text-[15px] font-bold text-navy">Doctor Case Review</p>
         <div className="mt-3 space-y-3">
-          {clusters.map((c) => {
-            const d = decisions[c.id];
-            return (
-              <div key={c.id} className="rounded-2xl bg-card border border-border p-4 shadow-soft">
-                <div className="flex items-start gap-3">
-                  <span className="w-9 h-9 rounded-lg bg-danger/10 text-danger grid place-items-center"><AlertTriangle className="w-4 h-4"/></span>
-                  <div className="flex-1">
+          {clusters.length ? clusters.map((c) => (
+            <div key={c.id} className="rounded-2xl bg-card border border-border p-4 shadow-soft">
+              <div className="flex items-start gap-3">
+                <span className={`w-9 h-9 rounded-lg grid place-items-center ${c.severity === "high" ? "bg-danger/10 text-danger" : "bg-warning/15 text-warning"}`}><AlertTriangle className="w-4 h-4"/></span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
                     <p className="text-[14px] font-bold text-navy">{c.title}</p>
-                    <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">{c.detail}</p>
+                    <span className="shrink-0 rounded-full bg-danger/10 px-2 py-1 text-[10px] font-bold text-danger">Rank {c.rank}</span>
+                  </div>
+                  <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">{c.detail}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wider">
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-navy">ZIP {c.zip}</span>
+                    <span className="text-teal">{c.illness.replace("-", " ")}</span>
+                    <span className={c.severity === "high" ? "text-danger" : "text-warning"}>{c.severity}</span>
                   </div>
                 </div>
-                {d ? (
-                  <div className={`mt-3 text-center text-[12px] font-semibold py-2 rounded-lg ${d === "confirm" ? "bg-success/10 text-success" : d === "review" ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground"}`}>
-                    {d === "confirm" ? "Confirmed — escalated to public health" : d === "review" ? "Marked for review" : "Dismissed"}
-                  </div>
-                ) : (
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <button onClick={()=>decide(c.id, "confirm")} className="rounded-lg bg-success/10 text-success py-2 text-[12px] font-bold flex items-center justify-center gap-1"><Check className="w-3 h-3"/> Confirm</button>
-                    <button onClick={()=>decide(c.id, "review")} className="rounded-lg bg-warning/15 text-warning py-2 text-[12px] font-bold">Needs Review</button>
-                    <button onClick={()=>decide(c.id, "dismiss")} className="rounded-lg bg-muted text-muted-foreground py-2 text-[12px] font-bold flex items-center justify-center gap-1"><X className="w-3 h-3"/> Dismiss</button>
-                  </div>
-                )}
               </div>
-            );
-          })}
+
+              <textarea
+                value={reports[c.id] ?? ""}
+                onChange={(e) => setReports((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                rows={3}
+                placeholder="Write doctor report: diagnosis notes, contagious risk, follow-up plan..."
+                className="mt-3 w-full rounded-xl bg-surface border border-border p-3 text-[12px] focus:outline-none focus:border-teal"
+              />
+
+              {c.doctorReport ? (
+                <div className="mt-3 rounded-xl bg-success/10 border border-success/20 p-3">
+                  <p className="text-[12px] font-bold text-success flex items-center gap-1"><ClipboardCheck className="w-3.5 h-3.5"/> Latest doctor note</p>
+                  <p className="mt-1 text-[12px] text-navy leading-relaxed">{c.doctorReport.summary}</p>
+                </div>
+              ) : null}
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <button onClick={() => decide(c.id, "monitor", true)} className="rounded-lg bg-warning/15 text-warning py-2 text-[12px] font-bold flex items-center justify-center gap-1"><ShieldAlert className="w-3 h-3"/> Monitor</button>
+                <button onClick={() => decide(c.id, "resolved", false)} className="rounded-lg bg-success/10 text-success py-2 text-[12px] font-bold flex items-center justify-center gap-1"><Check className="w-3 h-3"/> Resolved</button>
+                <button onClick={() => decide(c.id, "dismissed", false)} className="rounded-lg bg-muted text-muted-foreground py-2 text-[12px] font-bold flex items-center justify-center gap-1"><X className="w-3 h-3"/> Dismiss</button>
+              </div>
+            </div>
+          )) : (
+            <div className="rounded-2xl bg-success/10 border border-success/20 p-4">
+              <p className="text-[13px] font-bold text-success">No active case reports</p>
+              <p className="mt-1 text-[12px] text-navy">Resolved, dismissed, and expired reports are no longer shown on the live map.</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -138,13 +140,13 @@ function Doctor() {
         <p className="text-[15px] font-bold text-navy">Recommended Actions</p>
         <div className="mt-3 space-y-2">
           <div className="rounded-2xl bg-card border border-border p-4 shadow-soft">
-            <p className="text-[13px] font-bold text-navy">Prepare Flu/COVID testing resources</p>
-            <p className="text-[12px] text-muted-foreground mt-1">Based on the respiratory cluster in 85719, ensure adequate rapid test stock for walk-ins.</p>
+            <p className="text-[13px] font-bold text-navy">Prepare respiratory testing resources</p>
+            <p className="text-[12px] text-muted-foreground mt-1">Active rankings prioritize respiratory, flu-like, vector-borne, heat, and zoonotic signals.</p>
             <button className="mt-3 rounded-lg bg-teal text-white px-3 py-2 text-[12px] font-semibold">Notify Inventory Team</button>
           </div>
           <div className="rounded-2xl bg-warning/10 border border-warning/30 p-4">
-            <p className="text-[13px] font-bold text-warning flex items-center gap-1"><AlertTriangle className="w-4 h-4"/> Heat illness risk elevated</p>
-            <p className="text-[12px] text-navy mt-1">Local temperatures exceeding 105°F. Elderly demographic alerts have increased by 31% in the last 8 hours.</p>
+            <p className="text-[13px] font-bold text-warning flex items-center gap-1"><AlertTriangle className="w-4 h-4"/> Reports auto-expire</p>
+            <p className="text-[12px] text-navy mt-1">High-risk cases stay live for 96h, moderate for 72h, and low for 36h unless a doctor resolves or dismisses them sooner.</p>
           </div>
         </div>
         <Link to="/public-health" className="mt-4 w-full inline-flex items-center justify-between rounded-2xl bg-card border border-border p-4">
@@ -154,4 +156,10 @@ function Doctor() {
       </section>
     </AppShell>
   );
+}
+
+function defaultReport(action: "monitor" | "resolved" | "dismissed") {
+  if (action === "monitor") return "Case reviewed. Symptoms may be contagious; keep on live map for continued surveillance.";
+  if (action === "resolved") return "Patient or region appears recovered and non-contagious. Removed from live outbreak map.";
+  return "Reviewed as non-actionable or duplicate signal. Removed from live outbreak map.";
 }

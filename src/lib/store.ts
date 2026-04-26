@@ -1,4 +1,4 @@
-// Lightweight global store for OutbreakIQ demo state — no backend.
+// Lightweight global store for OutbreakIQ demo state - no backend yet.
 import { useSyncExternalStore } from "react";
 
 export type Symptom =
@@ -6,6 +6,8 @@ export type Symptom =
   | "sore-throat" | "body-aches" | "stomach";
 
 export type RiskLevel = "low" | "moderate" | "high";
+export type IllnessKind = "respiratory" | "flu-like" | "gastrointestinal" | "heat" | "vector-borne" | "zoonotic" | "baseline";
+export type CaseStatus = "active" | "doctor-review" | "resolved" | "dismissed" | "expired";
 
 export type CheckIn = {
   id: string;
@@ -36,18 +38,34 @@ export type AnimalIncident = {
   urgency: RiskLevel;
 };
 
+export type DoctorReport = {
+  summary: string;
+  action: "monitor" | "resolved" | "dismissed";
+  contagious: boolean;
+  reviewedAt: string;
+  reviewer: string;
+};
+
 export type CommunitySignal = {
   id: string;
   zip: string;
   type: "symptom-cluster" | "healthy-report" | "animal" | "mosquito" | "heat" | "clinic";
+  illness: IllnessKind;
   title: string;
   detail: string;
   ago: string;
   severity: RiskLevel;
-  // pseudo coords for the SVG map (0-100 in a 320x240 viewBox)
+  rank: number;
+  createdAt: string;
+  expiresAt: string;
+  status: CaseStatus;
+  longitude: number;
+  latitude: number;
+  // pseudo coords for the SVG fallback map (0-100 in a 320x240 viewBox)
   x: number;
   y: number;
   count?: number;
+  doctorReport?: DoctorReport;
 };
 
 export type State = {
@@ -60,14 +78,70 @@ export type State = {
   onboardingDone: boolean;
 };
 
+const now = Date.now();
+const hours = (n: number) => n * 60 * 60 * 1000;
+
+const ZIP_LOCATIONS: Record<string, { longitude: number; latitude: number; x: number; y: number }> = {
+  "85719": { longitude: -110.9499, latitude: 32.2429, x: 38, y: 42 },
+  "85705": { longitude: -110.9871, latitude: 32.2719, x: 62, y: 30 },
+  "85721": { longitude: -110.9501, latitude: 32.2321, x: 24, y: 60 },
+  "85641": { longitude: -110.7709, latitude: 32.0479, x: 70, y: 70 },
+  "85629": { longitude: -110.9298, latitude: 31.9557, x: 50, y: 80 },
+};
+
+function locationFor(zip: string) {
+  const known = ZIP_LOCATIONS[zip];
+  if (known) return known;
+
+  return {
+    longitude: -110.96 + (Math.random() - 0.5) * 0.16,
+    latitude: 32.18 + (Math.random() - 0.5) * 0.16,
+    x: 42 + Math.random() * 24,
+    y: 36 + Math.random() * 28,
+  };
+}
+
+function expiresFor(severity: RiskLevel, type: CommunitySignal["type"]) {
+  if (type === "clinic" || type === "healthy-report") return new Date(now + hours(24 * 30)).toISOString();
+  if (severity === "high") return new Date(Date.now() + hours(96)).toISOString();
+  if (severity === "moderate") return new Date(Date.now() + hours(72)).toISOString();
+  return new Date(Date.now() + hours(36)).toISOString();
+}
+
+function rankFor(input: {
+  severity: RiskLevel;
+  type: CommunitySignal["type"];
+  illness: IllnessKind;
+  count?: number;
+}) {
+  const severityBase = input.severity === "high" ? 70 : input.severity === "moderate" ? 44 : 18;
+  const typeBoost = input.type === "animal" ? 12 : input.type === "symptom-cluster" ? 10 : input.type === "mosquito" ? 7 : input.type === "heat" ? 6 : 0;
+  const illnessBoost = input.illness === "zoonotic" ? 10 : input.illness === "respiratory" ? 8 : input.illness === "vector-borne" ? 6 : 0;
+  return Math.min(100, severityBase + typeBoost + illnessBoost + Math.min(input.count ?? 0, 12));
+}
+
+function signal(input: Omit<CommunitySignal, "rank" | "createdAt" | "expiresAt" | "status" | "longitude" | "latitude"> & Partial<Pick<CommunitySignal, "createdAt" | "expiresAt" | "status" | "longitude" | "latitude">>): CommunitySignal {
+  const loc = locationFor(input.zip);
+  const createdAt = input.createdAt ?? new Date(now).toISOString();
+  return {
+    ...input,
+    longitude: input.longitude ?? loc.longitude,
+    latitude: input.latitude ?? loc.latitude,
+    rank: rankFor(input),
+    createdAt,
+    expiresAt: input.expiresAt ?? expiresFor(input.severity, input.type),
+    status: input.status ?? "active",
+  };
+}
+
 const SEED_SIGNALS: CommunitySignal[] = [
-  { id: "s1", zip: "85719", type: "symptom-cluster", title: "Unusual fatigue cluster near 85719", detail: "14 reports matching fatigue + low-grade fever in the past 48h.", ago: "2h", severity: "high", x: 38, y: 42, count: 14 },
-  { id: "s2", zip: "85705", type: "mosquito", title: "Mosquito risk elevated due to rainfall", detail: "Recent heavy rainfall combined with rising temperatures has boosted breeding.", ago: "4h", severity: "moderate", x: 62, y: 30 },
-  { id: "s3", zip: "85721", type: "symptom-cluster", title: "Respiratory symptoms up 22% near 85721", detail: "Abnormal resting HR and elevated respiratory rate detected within a 5-mile radius.", ago: "6h", severity: "moderate", x: 24, y: 60, count: 9 },
-  { id: "s4", zip: "85641", type: "heat", title: "Heat-related symptoms rising near campus", detail: "Hydration warnings active for the next 48h.", ago: "1d", severity: "moderate", x: 70, y: 70 },
-  { id: "s5", zip: "85629", type: "animal", title: "2 animal incidents reported", detail: "Cattle showing sudden sickness — possible zoonotic signal under review.", ago: "1d", severity: "high", x: 50, y: 80, count: 2 },
-  { id: "s6", zip: "85719", type: "clinic", title: "ValleyMed Clinic — walk-in available", detail: "Open until 9pm. CarePoint Telehealth covers after-hours.", ago: "—", severity: "low", x: 44, y: 50 },
-  { id: "s7", zip: "85705", type: "healthy-report", title: "412 healthy check-ins this week", detail: "Strong baseline data helping detect anomalies earlier.", ago: "live", severity: "low", x: 56, y: 22 },
+  signal({ id: "s1", zip: "85719", type: "symptom-cluster", illness: "flu-like", title: "Unusual fatigue cluster near 85719", detail: "14 reports matching fatigue + low-grade fever in the past 48h.", ago: "2h", severity: "high", x: 38, y: 42, count: 14, createdAt: new Date(now - hours(2)).toISOString() }),
+  signal({ id: "s2", zip: "85705", type: "mosquito", illness: "vector-borne", title: "Mosquito risk elevated due to rainfall", detail: "Recent heavy rainfall combined with rising temperatures has boosted breeding.", ago: "4h", severity: "moderate", x: 62, y: 30, createdAt: new Date(now - hours(4)).toISOString() }),
+  signal({ id: "s3", zip: "85721", type: "symptom-cluster", illness: "respiratory", title: "Respiratory symptoms up 22% near 85721", detail: "Abnormal resting HR and elevated respiratory rate detected within a 5-mile radius.", ago: "6h", severity: "moderate", x: 24, y: 60, count: 9, createdAt: new Date(now - hours(6)).toISOString() }),
+  signal({ id: "s4", zip: "85641", type: "heat", illness: "heat", title: "Heat-related symptoms rising near campus", detail: "Hydration warnings active for the next 48h.", ago: "1d", severity: "moderate", x: 70, y: 70, createdAt: new Date(now - hours(24)).toISOString() }),
+  signal({ id: "s5", zip: "85629", type: "animal", illness: "zoonotic", title: "2 animal incidents reported", detail: "Cattle showing sudden sickness - possible zoonotic signal under review.", ago: "1d", severity: "high", x: 50, y: 80, count: 2, createdAt: new Date(now - hours(24)).toISOString() }),
+  signal({ id: "s6", zip: "85719", type: "clinic", illness: "baseline", title: "ValleyMed Clinic - walk-in available", detail: "Open until 9pm. CarePoint Telehealth covers after-hours.", ago: "-", severity: "low", x: 44, y: 50 }),
+  signal({ id: "s7", zip: "85705", type: "healthy-report", illness: "baseline", title: "412 healthy check-ins this week", detail: "Strong baseline data helping detect anomalies earlier.", ago: "live", severity: "low", x: 56, y: 22 }),
 ];
 
 let state: State = {
@@ -83,6 +157,23 @@ let state: State = {
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
+export function isSignalLive(signal: CommunitySignal) {
+  if (signal.status === "resolved" || signal.status === "dismissed") return false;
+  if (Date.parse(signal.expiresAt) <= Date.now()) return false;
+  return signal.status === "active" || signal.status === "doctor-review";
+}
+
+export function activeSignals(signals: CommunitySignal[]) {
+  return signals.filter(isSignalLive).sort((a, b) => b.rank - a.rank);
+}
+
+function illnessFromSymptoms(symptoms: Symptom[]): IllnessKind {
+  if (symptoms.includes("cough") || symptoms.includes("sore-throat")) return "respiratory";
+  if (symptoms.includes("stomach")) return "gastrointestinal";
+  if (symptoms.includes("fever") || symptoms.includes("body-aches") || symptoms.includes("fatigue")) return "flu-like";
+  return "respiratory";
+}
+
 export const store = {
   get: () => state,
   subscribe: (l: () => void) => {
@@ -94,6 +185,37 @@ export const store = {
     state = { ...state, ...p };
     emit();
   },
+  expireStaleSignals: () => {
+    state = {
+      ...state,
+      signals: state.signals.map((s) =>
+        Date.parse(s.expiresAt) <= Date.now() && s.status !== "resolved" && s.status !== "dismissed"
+          ? { ...s, status: "expired" as const }
+          : s,
+      ),
+    };
+    emit();
+  },
+  doctorReviewSignal: (id: string, report: Omit<DoctorReport, "reviewedAt" | "reviewer"> & { reviewer?: string }) => {
+    const status: CaseStatus = report.action === "monitor" ? "doctor-review" : report.action;
+    state = {
+      ...state,
+      signals: state.signals.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              status,
+              doctorReport: {
+                ...report,
+                reviewedAt: new Date().toISOString(),
+                reviewer: report.reviewer ?? "Clinical reviewer",
+              },
+            }
+          : s,
+      ),
+    };
+    emit();
+  },
   addCheckIn: (c: CheckIn) => {
     state = {
       ...state,
@@ -101,23 +223,27 @@ export const store = {
       streak: state.streak + 1,
       points: state.points + (c.feeling === "healthy" ? 25 : 15),
     };
-    // If symptoms reported, drop a community signal
+
     if (c.feeling === "symptoms" && c.symptoms.length) {
-      const newSig: CommunitySignal = {
+      const loc = locationFor(c.zip);
+      const illness = illnessFromSymptoms(c.symptoms);
+      const newSig = signal({
         id: `c-${Date.now()}`,
         zip: c.zip,
         type: "symptom-cluster",
-        title: `New symptom report near ${c.zip}`,
+        illness,
+        title: `New ${illness.replace("-", " ")} report near ${c.zip}`,
         detail: `${c.symptoms.length} symptom(s): ${c.symptoms.join(", ")}.`,
         ago: "just now",
         severity: c.risk,
-        x: 40 + Math.random() * 20,
-        y: 40 + Math.random() * 20,
+        x: loc.x + (Math.random() - 0.5) * 8,
+        y: loc.y + (Math.random() - 0.5) * 8,
+        longitude: loc.longitude + (Math.random() - 0.5) * 0.025,
+        latitude: loc.latitude + (Math.random() - 0.5) * 0.025,
         count: 1,
-      };
+      });
       state = { ...state, signals: [newSig, ...state.signals] };
     } else if (c.feeling === "healthy") {
-      // bump community baseline counter
       state = {
         ...state,
         signals: state.signals.map((s) =>
@@ -130,18 +256,22 @@ export const store = {
     emit();
   },
   addIncident: (i: AnimalIncident) => {
-    const sig: CommunitySignal = {
+    const loc = locationFor(i.zip);
+    const sig = signal({
       id: `i-${Date.now()}`,
       zip: i.zip,
       type: "animal",
+      illness: "zoonotic",
       title: `Animal incident reported (${i.species})`,
       detail: i.notes || "Awaiting veterinary review via VetLink Network.",
       ago: "just now",
       severity: i.urgency,
-      x: 45 + Math.random() * 25,
-      y: 55 + Math.random() * 25,
+      x: loc.x + (Math.random() - 0.5) * 10,
+      y: loc.y + (Math.random() - 0.5) * 10,
+      longitude: loc.longitude + (Math.random() - 0.5) * 0.03,
+      latitude: loc.latitude + (Math.random() - 0.5) * 0.03,
       count: 1,
-    };
+    });
     state = {
       ...state,
       incidents: [i, ...state.incidents],
@@ -194,18 +324,17 @@ export function computeRisk(input: {
     factors.push("Reduced HRV / recovery");
   }
 
-  // local context — symptoms cluster nearby
-  const localCluster = store.get().signals.some(
+  const localCluster = activeSignals(store.get().signals).some(
     (s) => s.zip === input.zip && s.type === "symptom-cluster" && s.severity !== "low",
   );
   if (localCluster) { score += 10; factors.push("Nearby symptom clusters in your ZIP"); }
 
-  const animalNearby = store.get().signals.some(
+  const animalNearby = activeSignals(store.get().signals).some(
     (s) => s.zip === input.zip && s.type === "animal",
   );
   if (animalNearby) { score += 6; factors.push("Recent animal incidents nearby (zoonotic watch)"); }
 
-  const mosquitoNearby = store.get().signals.some(
+  const mosquitoNearby = activeSignals(store.get().signals).some(
     (s) => s.zip === input.zip && s.type === "mosquito",
   );
   if (mosquitoNearby) { score += 5; factors.push("Elevated mosquito risk after rainfall"); }

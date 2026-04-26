@@ -1,12 +1,23 @@
 import { Activity, LogIn, UserPlus } from "lucide-react";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { isAuthConfigured } from "@/lib/auth-config";
 import { useAppUser } from "@/hooks/use-app-user";
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading, loginWithRedirect } = useAppUser();
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingTimedOut(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setLoadingTimedOut(true), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [isLoading]);
+
+  if (isLoading && !loadingTimedOut) {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-5">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-teal border-t-transparent" />
@@ -61,6 +72,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
               </p>
             </div>
           ) : null}
+          {loadingTimedOut ? (
+            <div className="mt-5 rounded-2xl border border-warning/30 bg-warning/10 p-4">
+              <p className="text-[13px] font-bold text-warning">Auth0 is taking longer than expected</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-navy">
+                Try refreshing after the dev server restarts, and confirm this URL is allowed in Auth0.
+              </p>
+            </div>
+          ) : null}
         </div>
       </main>
     );
@@ -68,4 +87,3 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   return children;
 }
-

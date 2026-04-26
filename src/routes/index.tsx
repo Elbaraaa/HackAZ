@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
-import { AuthStatus } from "@/components/AuthStatus";
 import { Activity, AlertTriangle, Bug, ChevronRight, Heart, MapPin, ShieldCheck, Sparkles, Stethoscope, UserRound, Users } from "lucide-react";
-import { useStore } from "@/lib/store";
+import { activeSignals, useStore } from "@/lib/store";
+import { InteractiveRegionMap } from "@/components/InteractiveRegionMap";
+import { useMemo } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -16,21 +17,21 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefined;
+
 function Index() {
   const signals = useStore((s) => s.signals);
   const streak = useStore((s) => s.streak);
   const points = useStore((s) => s.points);
-  const topSignal = signals.find((s) => s.severity === "high") ?? signals[0];
+  const liveSignals = useMemo(() => activeSignals(signals), [signals]);
+  const topSignal = liveSignals.find((s) => s.severity === "high") ?? liveSignals[0];
 
   return (
     <AppShell>
       <TopBar title="OutbreakIQ" pill={<StatusPill tone="live">AI Surveillance Active</StatusPill>} right={
-        <div className="flex items-center gap-2">
-          <AuthStatus />
-          <Link to="/insights" className="w-9 h-9 rounded-full bg-gradient-teal grid place-items-center text-teal-foreground shadow-glow">
-            <Sparkles className="w-4 h-4" />
-          </Link>
-        </div>
+        <Link to="/insights" className="w-9 h-9 rounded-full bg-gradient-teal grid place-items-center text-teal-foreground shadow-glow">
+          <Sparkles className="w-4 h-4" />
+        </Link>
       }/>
 
       <section className="px-5 pt-4 pb-6">
@@ -57,7 +58,7 @@ function Index() {
 
       {/* Map preview card */}
       <section className="px-5">
-        <Link to="/map" className="block rounded-2xl bg-gradient-dark-card p-4 shadow-elevated relative overflow-hidden">
+        <div className="rounded-2xl bg-gradient-dark-card p-4 shadow-elevated relative overflow-hidden">
           <div className="flex items-center justify-between text-[10px] tracking-wider uppercase text-white/60 font-semibold">
             <span>Local Clusters</span>
             <span className="flex items-center gap-1 text-warning"><AlertTriangle className="w-3 h-3" /> High Anomaly</span>
@@ -68,13 +69,19 @@ function Index() {
           </div>
 
           <div className="relative mt-3 h-32 rounded-xl bg-white/5 overflow-hidden">
-            <MiniMap />
+            {MAPBOX_TOKEN ? (
+              <InteractiveRegionMap signals={liveSignals} token={MAPBOX_TOKEN} className="h-32 rounded-xl" compact />
+            ) : (
+              <MiniMap />
+            )}
           </div>
           <div className="mt-3 flex items-center justify-between">
-            <span className="text-white/80 text-xs">Open community map</span>
-            <ChevronRight className="w-4 h-4 text-white/80" />
+            <span className="text-white/80 text-xs">Drag the preview or open the full map</span>
+            <Link to="/map" className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white">
+              Open <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-        </Link>
+        </div>
       </section>
 
       {/* Streak / rewards */}

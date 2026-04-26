@@ -7,16 +7,18 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
     return children;
   }
 
+  const authorizationParams = {
+    redirect_uri: authConfig.redirectUri,
+    ...(authConfig.audience ? { audience: authConfig.audience } : {}),
+  };
+
   return (
     <Auth0Provider
       domain={authConfig.domain}
       clientId={authConfig.clientId}
       cacheLocation="localstorage"
       useRefreshTokens={authConfig.useRefreshTokens}
-      authorizationParams={{
-        redirect_uri: authConfig.redirectUri,
-        audience: authConfig.audience,
-      }}
+      authorizationParams={authorizationParams}
       onRedirectCallback={(appState) => {
         window.history.replaceState({}, document.title, appState?.returnTo || window.location.pathname);
       }}
@@ -25,4 +27,3 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
     </Auth0Provider>
   );
 }
-
