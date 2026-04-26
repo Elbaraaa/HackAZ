@@ -1,7 +1,8 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Activity, Gift, Map as MapIcon, Stethoscope, Home, Shield, UserRound } from "lucide-react";
-import { type ReactNode, useId } from "react";
+import { type ReactNode, useEffect, useId } from "react";
 import { useAppUser } from "@/hooks/use-app-user";
+import { store, type ServerHealthCheckIn } from "@/lib/store";
 
 const tabs = [
   { to: "/", label: "Home", icon: Home },
@@ -14,6 +15,7 @@ const tabs = [
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
+  useServerCheckInSync();
   const loc = useLocation();
   const { role } = useAppUser();
   const visibleTabs = tabs.filter((tab) => {
@@ -48,6 +50,34 @@ export function AppShell({ children }: { children: ReactNode }) {
       </nav>
     </div>
   );
+}
+
+function useServerCheckInSync() {
+  useEffect(() => {
+    let stopped = false;
+
+    const load = async () => {
+      try {
+        const response = await fetch("/api/checkins?limit=50", {
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!stopped && data?.success && Array.isArray(data.checkIns)) {
+          store.mergeServerCheckIns(data.checkIns as ServerHealthCheckIn[]);
+        }
+      } catch {
+        // The app should keep working offline or before DATABASE_URL is configured.
+      }
+    };
+
+    void load();
+    const interval = window.setInterval(load, 15000);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+    };
+  }, []);
 }
 
 export function TopBar({

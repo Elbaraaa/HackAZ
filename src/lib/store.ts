@@ -128,6 +128,22 @@ export type State = {
   onboardingDone: boolean;
 };
 
+export type ServerHealthCheckIn = {
+  id: string;
+  userId: string;
+  feeling: "good" | "sick" | "unsure";
+  symptoms: string[];
+  duration?: string;
+  fever?: boolean | "unknown";
+  massGathering?: boolean | "unknown";
+  source?: string;
+  dailyCheckInComplete?: boolean;
+  summary?: string;
+  nextSteps?: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
 const now = Date.now();
 const hours = (n: number) => n * 60 * 60 * 1000;
 
@@ -285,6 +301,85 @@ function initialSignalSeverity(risk: RiskLevel, count = 1): RiskLevel {
   return "low";
 }
 
+function feelingFromServer(feeling: ServerHealthCheckIn["feeling"]): CheckIn["feeling"] {
+  if (feeling === "good") return "healthy";
+  if (feeling === "sick") return "symptoms";
+  return "unsure";
+}
+
+function symptomFromText(value: string): Symptom | undefined {
+  const text = value.toLowerCase();
+  if (text.includes("breath") || text.includes("shortness")) return "difficulty-breathing";
+  if (text.includes("cough") || text.includes("congestion")) return "cough-congestion";
+  if (text.includes("nausea") || text.includes("vomit")) return "nausea-vomiting";
+  if (text.includes("sore") && text.includes("throat")) return "sore-throat";
+  if (text.includes("rash")) return "rash";
+  if (text.includes("fever")) return "fever";
+  if (text.includes("chill")) return "chills";
+  if (text.includes("diarrhea")) return "diarrhea";
+  if (text.includes("bleed")) return "bleeding-openings";
+  if (text.includes("red eye")) return "red-eyes";
+  if (text.includes("ache") || text.includes("pain")) return "body-aches";
+  if (text.includes("urine")) return "discolored-bloody-urine";
+  if (text.includes("smell") || text.includes("taste")) return "loss-smell-taste";
+  if (text.includes("yellow") || text.includes("jaundice")) return "yellow-skin-eyes";
+  if (text.includes("fatigue") || text.includes("tired")) return "fatigue";
+  if (text.includes("headache")) return "headache";
+  if (text.includes("stomach")) return "stomach";
+  return undefined;
+}
+
+function symptomsFromServer(input: ServerHealthCheckIn) {
+  const symptoms = new Set<Symptom>();
+  const unmatched: string[] = [];
+
+  for (const raw of input.symptoms ?? []) {
+    const symptom = symptomFromText(raw);
+    if (symptom) symptoms.add(symptom);
+    else if (raw.trim()) unmatched.push(raw.trim());
+  }
+
+  if (input.fever === true) symptoms.add("fever");
+  if (!symptoms.size && input.feeling === "sick") symptoms.add("other");
+  if (unmatched.length) symptoms.add("other");
+
+  return {
+    symptoms: [...symptoms],
+    otherSymptom: unmatched.length ? unmatched.join(", ") : undefined,
+  };
+}
+
+function relativeAgo(iso: string) {
+  const ageMs = Math.max(0, Date.now() - Date.parse(iso));
+  const minutes = Math.floor(ageMs / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hoursAgo = Math.floor(minutes / 60);
+  if (hoursAgo < 24) return `${hoursAgo}h ago`;
+  return `${Math.floor(hoursAgo / 24)}d ago`;
+}
+
+function checkInFromServer(input: ServerHealthCheckIn): CheckIn {
+  const feeling = feelingFromServer(input.feeling);
+  const { symptoms, otherSymptom } = symptomsFromServer(input);
+  const vitals = simulateVitals(feeling);
+  const risk = computeRisk({ feeling, symptoms, vitals, zip: state.zip });
+
+  return {
+    id: input.id,
+    reporterUserId: input.userId,
+    date: input.createdAt,
+    zip: state.zip,
+    feeling,
+    symptoms,
+    setting: "home",
+    otherSymptom,
+    soughtCare: input.summary ? /care|doctor|clinic|treatment|health/i.test(input.summary) : undefined,
+    vitals,
+    risk: risk.level,
+  };
+}
+
 export const store = {
   get: () => state,
   subscribe: (l: () => void) => {
@@ -294,6 +389,65 @@ export const store = {
   set: (patch: Partial<State> | ((s: State) => Partial<State>)) => {
     const p = typeof patch === "function" ? patch(state) : patch;
     state = { ...state, ...p };
+    emit();
+  },
+  mergeServerCheckIns: (serverCheckIns: ServerHealthCheckIn[]) => {
+    const existingCheckIns = new Set(state.checkIns.map((c) => c.id));
+    const existingSignals = new Set(state.signals.map((s) => s.id));
+    const newCheckIns = serverCheckIns
+      .filter((checkIn) => checkIn?.id && !existingCheckIns.has(checkIn.id))
+      .map(checkInFromServer);
+
+    if (!newCheckIns.length) return;
+
+    const newSignals = newCheckIns
+      .filter((c) => c.feeling === "symptoms" && c.symptoms.length)
+      .map((c) => {
+        const id = `remote-${c.id}`;
+        if (existingSignals.has(id)) return null;
+
+        const loc = locationFor(c.zip, id);
+        const illness = illnessFromSymptoms(c.symptoms);
+        const source = serverCheckIns.find((checkIn) => checkIn.id === c.id)?.source;
+        const symptomText = c.symptoms.map((symptom) =>
+          symptom === "other" && c.otherSymptom ? `other: ${c.otherSymptom}` : symptom,
+        );
+
+        return signal({
+          id,
+          reporterUserId: c.reporterUserId,
+          reviewLane: "clinical",
+          reviewerWorkspaceId: DEFAULT_REVIEW_WORKSPACE_ID,
+          zip: c.zip,
+          type: "symptom-cluster",
+          illness,
+          title: `${source === "alexa" ? "Alexa" : "Remote"} check-in near ${c.zip}`,
+          detail: `${c.symptoms.length} symptom(s): ${symptomText.join(", ")}.`,
+          ago: relativeAgo(c.date),
+          createdAt: c.date,
+          severity: initialSignalSeverity(c.risk, 1),
+          x: loc.x,
+          y: loc.y,
+          count: 1,
+        });
+      })
+      .filter((s): s is CommunitySignal => Boolean(s));
+
+    const healthyCount = newCheckIns.filter((c) => c.feeling === "healthy").length;
+    state = {
+      ...state,
+      checkIns: [...newCheckIns, ...state.checkIns],
+      signals: [
+        ...newSignals,
+        ...state.signals.map((s) =>
+          healthyCount && s.type === "healthy-report"
+            ? { ...s, title: `${412 + state.checkIns.length + newCheckIns.length} healthy check-ins this week` }
+            : s,
+        ),
+      ],
+      streak: state.streak + newCheckIns.length,
+      points: state.points + newCheckIns.reduce((total, c) => total + (c.feeling === "healthy" ? 25 : 15), 0),
+    };
     emit();
   },
   expireStaleSignals: () => {

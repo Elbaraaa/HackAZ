@@ -1,10 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { isDatabaseConfigured } from "@/lib/server/auth-db";
-import { saveHealthCheckIn, type HealthCheckInInput } from "@/lib/server/health-checkins";
+import { listHealthCheckIns, saveHealthCheckIn, type HealthCheckInInput } from "@/lib/server/health-checkins";
 
 export const Route = createFileRoute("/api/checkins")({
   server: {
     handlers: {
+      GET: async ({ request }) => {
+        if (!isDatabaseConfigured()) {
+          return Response.json({ success: true, configured: false, checkIns: [] });
+        }
+
+        try {
+          const url = new URL(request.url);
+          const limit = Number(url.searchParams.get("limit") ?? 50);
+          const source = url.searchParams.get("source") ?? undefined;
+          const checkIns = await listHealthCheckIns({ limit, source });
+          return Response.json({ success: true, configured: true, checkIns });
+        } catch (error) {
+          console.error("Check-in list API error", error);
+          const message = error instanceof Error ? error.message : "Could not load check-ins.";
+          return Response.json({ success: false, error: message }, { status: 500 });
+        }
+      },
       POST: async ({ request }) => {
         if (!isDatabaseConfigured()) {
           return Response.json({ success: false, error: "DATABASE_URL is not configured." }, { status: 503 });
