@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { useStore } from "@/lib/store";
-import { Bug, ChevronRight, Cloud, Heart, Microscope, ShieldCheck, Stethoscope, Watch } from "lucide-react";
+import { Bug, ChevronRight, Cloud, Gift, Heart, Microscope, ShieldCheck, Stethoscope, Watch } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 
 export const Route = createFileRoute("/public-health")({
@@ -28,7 +28,7 @@ const SOURCES = [
   { icon: Watch, label: "Wearable trends", weight: 22, color: "oklch(0.62 0.11 195)" },
   { icon: Bug, label: "Animal incidents", weight: 14, color: "oklch(0.78 0.16 75)" },
   { icon: Cloud, label: "Weather / mosquito", weight: 10, color: "oklch(0.55 0.13 175)" },
-  { icon: Stethoscope, label: "Doctor validation", weight: 8, color: "oklch(0.32 0.09 220)" },
+  { icon: Stethoscope, label: "Reviewer validation", weight: 8, color: "oklch(0.32 0.09 220)" },
 ];
 
 function PublicHealth() {
@@ -83,16 +83,36 @@ function PublicHealth() {
         <p className="text-[15px] font-bold text-navy">Model Card</p>
         <div className="mt-3 rounded-2xl bg-gradient-dark-card text-white p-5 shadow-elevated space-y-3">
           <ModelRow k="Purpose" v="Detect early community outbreak signals using multi-source participatory data."/>
-          <ModelRow k="Inputs" v="Symptom reports, healthy check-ins, wearable vitals, animal incidents, weather, doctor validation."/>
+          <ModelRow k="Inputs" v="Symptom reports, healthy check-ins, wearable vitals, animal incidents, environmental incidents, weather, and reviewer validation."/>
           <ModelRow k="Limitations" v="Not a diagnosis; ZIP-level granularity; relies on opt-in reporting."/>
           <ModelRow k="Bias & Privacy" v="Anonymous reports, ZIP-only location, opt-in wearable data, farmer-controlled sharing."/>
-          <ModelRow k="Human Oversight" v="All alerts require doctor validation before escalation to public health."/>
+          <ModelRow k="Human Oversight" v="Alerts can be validated by clinical, veterinary, or environmental health reviewers before escalation."/>
 
           <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10">
             <Metric label="Retention" v="74%"/>
             <Metric label="Detection lead" v="3.2 days"/>
             <Metric label="Cluster acc." v="88%"/>
           </div>
+        </div>
+      </section>
+
+      <section className="px-5 mt-5">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <div className="flex items-start gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-warning/10 text-warning">
+              <Gift className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-navy">Participation incentives</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                Rewards help keep healthy baselines, symptom reports, animal incidents, and environmental signals flowing into the model.
+              </p>
+            </div>
+          </div>
+          <Link to="/rewards" className="mt-3 flex items-center justify-between rounded-xl bg-surface px-3 py-2 text-[12px] font-bold text-navy">
+            View incentive model
+            <ChevronRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 

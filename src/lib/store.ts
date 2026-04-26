@@ -3,8 +3,11 @@ import { useSyncExternalStore } from "react";
 import type { ApproxLocation } from "@/lib/location";
 
 export type Symptom =
-  | "fever" | "cough" | "fatigue" | "headache"
-  | "sore-throat" | "body-aches" | "stomach" | "other";
+  | "cough-congestion" | "nausea-vomiting" | "difficulty-breathing"
+  | "sore-throat" | "rash" | "fever" | "chills" | "diarrhea"
+  | "bleeding-openings" | "red-eyes" | "body-aches" | "discolored-bloody-urine"
+  | "loss-smell-taste" | "yellow-skin-eyes"
+  | "cough" | "fatigue" | "headache" | "stomach" | "other";
 
 export type RiskLevel = "low" | "moderate" | "high";
 export type IllnessKind = "respiratory" | "flu-like" | "gastrointestinal" | "heat" | "vector-borne" | "zoonotic" | "baseline";
@@ -18,6 +21,9 @@ export type CheckIn = {
   symptoms: Symptom[];
   setting: "workplace" | "home" | "campus" | "travel";
   otherSymptom?: string;
+  absentFromWork?: boolean;
+  absentFromSchool?: boolean;
+  soughtCare?: boolean;
   vitals: {
     restingHr: number;
     hrBaselineDeltaPct: number;
@@ -37,6 +43,7 @@ export type AnimalIncident = {
   zip: string;
   species: "cattle" | "poultry" | "horse" | "sheep-goat" | "wildlife" | "other";
   incident: "dead" | "sudden-sickness" | "unusual-behavior" | "multiple-affected";
+  affectedAnimals: number;
   notes: string;
   urgency: RiskLevel;
   approxLocation?: ApproxLocation;
@@ -46,6 +53,21 @@ export type AnimalIncident = {
     size: number;
     previewUrl?: string;
   };
+  photoAnalysis?: string;
+  voiceTranscript?: string;
+  voiceSummary?: string;
+};
+
+export type EnvironmentalIncident = {
+  id: string;
+  date: string;
+  zip: string;
+  type: "water-flooding" | "water-contamination" | "vector-spotting" | "other";
+  vectorCount?: number;
+  notes: string;
+  urgency: RiskLevel;
+  approxLocation?: ApproxLocation;
+  photo?: AnimalIncident["photo"];
   photoAnalysis?: string;
   voiceTranscript?: string;
   voiceSummary?: string;
@@ -62,7 +84,7 @@ export type DoctorReport = {
 export type CommunitySignal = {
   id: string;
   zip: string;
-  type: "symptom-cluster" | "healthy-report" | "animal" | "mosquito" | "heat" | "clinic";
+  type: "symptom-cluster" | "healthy-report" | "animal" | "environmental" | "mosquito" | "heat" | "clinic";
   illness: IllnessKind;
   title: string;
   detail: string;
@@ -80,6 +102,8 @@ export type CommunitySignal = {
   photoAnalysis?: string;
   voiceTranscript?: string;
   voiceSummary?: string;
+  affectedAnimals?: number;
+  vectorCount?: number;
   // pseudo coords for the SVG fallback map (0-100 in a 320x240 viewBox)
   x: number;
   y: number;
@@ -90,6 +114,7 @@ export type CommunitySignal = {
 export type State = {
   checkIns: CheckIn[];
   incidents: AnimalIncident[];
+  environmentalIncidents: EnvironmentalIncident[];
   signals: CommunitySignal[];
   streak: number;
   points: number;
@@ -181,7 +206,7 @@ function rankFor(input: {
 }) {
   const count = input.count ?? 1;
   const severityBase = input.severity === "high" ? 46 : input.severity === "moderate" ? 32 : 18;
-  const typeBoost = input.type === "animal" ? 8 : input.type === "symptom-cluster" ? 6 : input.type === "mosquito" ? 6 : input.type === "heat" ? 5 : 0;
+  const typeBoost = input.type === "animal" ? 8 : input.type === "environmental" ? 7 : input.type === "symptom-cluster" ? 6 : input.type === "mosquito" ? 6 : input.type === "heat" ? 5 : 0;
   const illnessBoost = input.illness === "zoonotic" ? 8 : input.illness === "respiratory" ? 5 : input.illness === "vector-borne" ? 5 : 0;
   const clusterBoost = Math.min(Math.max(count - 1, 0) * 8, 34);
   return Math.min(100, severityBase + typeBoost + illnessBoost + clusterBoost);
@@ -214,6 +239,7 @@ const SEED_SIGNALS: CommunitySignal[] = [
 let state: State = {
   checkIns: [],
   incidents: [],
+  environmentalIncidents: [],
   signals: SEED_SIGNALS,
   streak: 5,
   points: 240,
@@ -235,10 +261,10 @@ export function activeSignals(signals: CommunitySignal[]) {
 }
 
 function illnessFromSymptoms(symptoms: Symptom[]): IllnessKind {
-  if (symptoms.includes("cough") || symptoms.includes("sore-throat")) return "respiratory";
-  if (symptoms.includes("stomach")) return "gastrointestinal";
+  if (symptoms.includes("cough") || symptoms.includes("cough-congestion") || symptoms.includes("difficulty-breathing") || symptoms.includes("sore-throat") || symptoms.includes("loss-smell-taste")) return "respiratory";
+  if (symptoms.includes("stomach") || symptoms.includes("nausea-vomiting") || symptoms.includes("diarrhea") || symptoms.includes("discolored-bloody-urine") || symptoms.includes("yellow-skin-eyes")) return "gastrointestinal";
   if (symptoms.includes("other")) return "flu-like";
-  if (symptoms.includes("fever") || symptoms.includes("body-aches") || symptoms.includes("fatigue")) return "flu-like";
+  if (symptoms.includes("fever") || symptoms.includes("chills") || symptoms.includes("body-aches") || symptoms.includes("fatigue") || symptoms.includes("rash") || symptoms.includes("red-eyes") || symptoms.includes("bleeding-openings")) return "flu-like";
   return "respiratory";
 }
 
@@ -309,13 +335,18 @@ export const store = {
       const symptomText = c.symptoms.map((symptom) =>
         symptom === "other" && c.otherSymptom ? `other: ${c.otherSymptom}` : symptom,
       );
+      const followUps = [
+        c.absentFromWork ? "absent from work" : "",
+        c.absentFromSchool ? "absent from school" : "",
+        c.soughtCare ? "sought health care/treatment" : "",
+      ].filter(Boolean);
       const newSig = signal({
         id,
         zip: c.zip,
         type: "symptom-cluster",
         illness,
         title: `New ${illness.replace("-", " ")} report near ${c.zip}`,
-        detail: `${c.symptoms.length} symptom(s): ${symptomText.join(", ")}.`,
+        detail: `${c.symptoms.length} symptom(s): ${symptomText.join(", ")}.${followUps.length ? ` Follow-up: ${followUps.join(", ")}.` : ""}`,
         ago: "just now",
         createdAt: c.date,
         severity: initialSignalSeverity(c.risk, 1),
@@ -343,6 +374,7 @@ export const store = {
   addIncident: (i: AnimalIncident) => {
     const id = `i-${Date.now()}`;
     const loc = locationFor(i.zip, id);
+    const affectedAnimals = Math.max(1, Math.round(i.affectedAnimals || 1));
     const devicePoint = i.approxLocation
       ? fallbackPointFor(i.approxLocation.longitude, i.approxLocation.latitude)
       : undefined;
@@ -351,11 +383,11 @@ export const store = {
       zip: i.zip,
       type: "animal",
       illness: "zoonotic",
-      title: `Animal incident reported (${i.species})`,
-      detail: i.notes || "Awaiting veterinary review via VetLink Network.",
+      title: `${affectedAnimals} ${i.species} ${affectedAnimals === 1 ? "animal" : "animals"} affected`,
+      detail: i.notes || `${i.incident.replace("-", " ")} reported. Awaiting veterinary review via VetLink Network.`,
       ago: "just now",
       createdAt: i.date,
-      severity: initialSignalSeverity(i.urgency, 1),
+      severity: initialSignalSeverity(i.urgency, affectedAnimals),
       x: devicePoint?.x ?? loc.x,
       y: devicePoint?.y ?? loc.y,
       longitude: i.approxLocation?.longitude ?? loc.longitude,
@@ -366,13 +398,54 @@ export const store = {
       photoAnalysis: i.photoAnalysis,
       voiceTranscript: i.voiceTranscript,
       voiceSummary: i.voiceSummary,
-      count: 1,
+      affectedAnimals,
+      count: affectedAnimals,
     });
     state = {
       ...state,
       incidents: [i, ...state.incidents],
       signals: [sig, ...state.signals],
       points: state.points + 30,
+    };
+    emit();
+  },
+  addEnvironmentalIncident: (i: EnvironmentalIncident) => {
+    const id = `e-${Date.now()}`;
+    const loc = locationFor(i.zip, id);
+    const devicePoint = i.approxLocation
+      ? fallbackPointFor(i.approxLocation.longitude, i.approxLocation.latitude)
+      : undefined;
+    const typeLabel = i.type.replace("-", " ");
+    const count = Math.max(1, Math.round(i.vectorCount || 1));
+    const isVector = i.type === "vector-spotting";
+    const sig = signal({
+      id,
+      zip: i.zip,
+      type: "environmental",
+      illness: isVector ? "vector-borne" : i.type === "water-contamination" ? "gastrointestinal" : "baseline",
+      title: isVector ? `Vector spotting reported (${count})` : `${typeLabel} reported`,
+      detail: i.notes || (isVector ? `Reported density/number of vectors: ${count}.` : "Environmental issue reported for public health review."),
+      ago: "just now",
+      createdAt: i.date,
+      severity: initialSignalSeverity(i.urgency, isVector ? count : 1),
+      x: devicePoint?.x ?? loc.x,
+      y: devicePoint?.y ?? loc.y,
+      longitude: i.approxLocation?.longitude ?? loc.longitude,
+      latitude: i.approxLocation?.latitude ?? loc.latitude,
+      locationSource: i.approxLocation ? "device" : "zip",
+      locationAccuracyMiles: i.approxLocation?.privacyRadiusMiles,
+      evidencePhoto: i.photo,
+      photoAnalysis: i.photoAnalysis,
+      voiceTranscript: i.voiceTranscript,
+      voiceSummary: i.voiceSummary,
+      vectorCount: isVector ? count : undefined,
+      count: isVector ? count : 1,
+    });
+    state = {
+      ...state,
+      environmentalIncidents: [i, ...state.environmentalIncidents],
+      signals: [sig, ...state.signals],
+      points: state.points + 20,
     };
     emit();
   },
@@ -401,7 +474,11 @@ export function computeRisk(input: {
 
   score += input.symptoms.length * 6;
   if (input.symptoms.includes("fever")) factors.push("Fever reported");
-  if (input.symptoms.includes("cough")) factors.push("Cough reported");
+  if (input.symptoms.includes("cough") || input.symptoms.includes("cough-congestion")) factors.push("Cough or congestion reported");
+  if (input.symptoms.includes("difficulty-breathing")) { score += 16; factors.push("Difficulty breathing reported"); }
+  if (input.symptoms.includes("bleeding-openings")) { score += 16; factors.push("Bleeding from body openings reported"); }
+  if (input.symptoms.includes("yellow-skin-eyes")) { score += 10; factors.push("Yellow skin or eyes reported"); }
+  if (input.symptoms.includes("discolored-bloody-urine")) { score += 10; factors.push("Discolored or bloody urine reported"); }
 
   if (input.vitals.hrBaselineDeltaPct > 8) {
     score += 15;

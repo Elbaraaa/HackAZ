@@ -70,7 +70,7 @@ function Admin() {
 
       <section className="px-5 mt-5 grid grid-cols-2 gap-3">
         <Metric icon={<Users className="h-4 w-4" />} label="Known users" value={snapshot.activeUsers} />
-        <Metric icon={<Stethoscope className="h-4 w-4" />} label="Doctors" value={snapshot.activeDoctors} />
+        <Metric icon={<Stethoscope className="h-4 w-4" />} label="Reviewers" value={snapshot.activeDoctors} />
         <Metric icon={<Activity className="h-4 w-4" />} label="Signals" value={snapshot.activeSignals} />
         <Metric icon={<ShieldAlert className="h-4 w-4" />} label="High risk" value={highRiskClusters} />
       </section>
@@ -79,8 +79,8 @@ function Admin() {
         <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
           <p className="text-[14px] font-bold text-navy">Next database-backed views</p>
           <div className="mt-3 space-y-2 text-[12px] text-muted-foreground">
-            <p>Role management: users, doctors, admins.</p>
-            <p>Clinical access: doctor-to-patient assignments.</p>
+            <p>Role management: users, reviewers, admins.</p>
+            <p>Review access: clinical, veterinary, and environmental queues.</p>
             <p>Analytics: check-ins, risk scores, clusters, and usage trends.</p>
           </div>
         </div>

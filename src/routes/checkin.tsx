@@ -1,9 +1,11 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { useState } from "react";
-import { Activity, AlertTriangle, Heart, HelpCircle, ChevronRight, LocateFixed } from "lucide-react";
+import { Activity, AlertTriangle, Heart, HelpCircle, ChevronRight, Gift, LocateFixed } from "lucide-react";
 import { computeRisk, simulateVitals, store, type CheckIn, type Symptom } from "@/lib/store";
 import { requestApproxLocation, type ApproxLocation } from "@/lib/location";
+import { rewardAudience } from "@/lib/rewards";
+import { analyzeSymptoms, type SymptomTriage } from "@/lib/symptom-triage";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/checkin")({
@@ -17,26 +19,44 @@ export const Route = createFileRoute("/checkin")({
 });
 
 const SYMPTOMS: { id: Symptom; label: string }[] = [
-  { id: "fever", label: "Fever" },
-  { id: "fatigue", label: "Fatigue" },
-  { id: "cough", label: "Cough" },
-  { id: "headache", label: "Headache" },
-  { id: "stomach", label: "Stomach Issues" },
+  { id: "cough-congestion", label: "Cough / congestion" },
+  { id: "nausea-vomiting", label: "Nausea / vomiting" },
+  { id: "difficulty-breathing", label: "Difficulty breathing" },
   { id: "sore-throat", label: "Sore Throat" },
-  { id: "body-aches", label: "Body Aches" },
+  { id: "rash", label: "Rash" },
+  { id: "fever", label: "Fever" },
+  { id: "chills", label: "Chills" },
+  { id: "diarrhea", label: "Diarrhea" },
+  { id: "bleeding-openings", label: "Bleeding from body openings" },
+  { id: "red-eyes", label: "Red eyes" },
+  { id: "body-aches", label: "Body aches" },
+  { id: "discolored-bloody-urine", label: "Discolored or bloody urine" },
+  { id: "loss-smell-taste", label: "Loss of smell or taste" },
+  { id: "yellow-skin-eyes", label: "Yellow skin / yellow eyes" },
   { id: "other", label: "Something Else" },
 ];
 
 function CheckIn() {
   const navigate = useNavigate();
   const [feeling, setFeeling] = useState<CheckIn["feeling"]>("symptoms");
-  const [symptoms, setSymptoms] = useState<Symptom[]>(["fatigue"]);
+  const [symptoms, setSymptoms] = useState<Symptom[]>(["cough-congestion"]);
   const [otherSymptom, setOtherSymptom] = useState("");
+  const [absentFromWork, setAbsentFromWork] = useState(false);
+  const [absentFromSchool, setAbsentFromSchool] = useState(false);
+  const [soughtCare, setSoughtCare] = useState(false);
   const [zip, setZip] = useState("85719");
   const [setting, setSetting] = useState<CheckIn["setting"]>("workplace");
   const [approxLocation, setApproxLocation] = useState<ApproxLocation | undefined>();
   const [locating, setLocating] = useState(false);
   const vitals = simulateVitals(feeling);
+  const activeReward = rewardAudience(feeling === "symptoms" ? "symptom" : "healthy");
+  const symptomTriage = analyzeSymptoms({
+    feeling,
+    symptoms: feeling === "symptoms" ? symptoms : [],
+    vitals,
+    zip,
+    otherSymptom,
+  });
 
   const toggleSym = (s: Symptom) =>
     setSymptoms((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
@@ -64,6 +84,9 @@ function CheckIn() {
       symptoms: feeling === "symptoms" ? symptoms : [],
       setting,
       otherSymptom: symptoms.includes("other") ? otherSymptom.trim() : undefined,
+      absentFromWork,
+      absentFromSchool,
+      soughtCare,
       vitals,
       risk: r.level,
       approxLocation,
@@ -147,6 +170,18 @@ function CheckIn() {
               </p>
             </div>
           ) : null}
+          <div className="mt-4 rounded-2xl border border-border bg-card p-4">
+            <p className="text-[13px] font-bold text-navy">Follow-up questions</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              Please select any options that are relevant to this health signal.
+            </p>
+            <div className="mt-3 space-y-2">
+              <FollowUpToggle label="Absent from work?" checked={absentFromWork} onChange={setAbsentFromWork} />
+              <FollowUpToggle label="Absent from school?" checked={absentFromSchool} onChange={setAbsentFromSchool} />
+              <FollowUpToggle label="Did you seek health care or treatment?" checked={soughtCare} onChange={setSoughtCare} />
+            </div>
+          </div>
+          <SymptomTriageCard triage={symptomTriage} />
         </section>
       )}
 
@@ -180,6 +215,32 @@ function CheckIn() {
               {opt}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="px-5 mt-6">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <div className="flex items-start gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-warning/10 text-warning">
+              <Gift className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-navy">{activeReward.shortTitle}</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{activeReward.summary}</p>
+              <ul className="mt-2 space-y-1">
+                {activeReward.benefits.slice(0, 2).map((benefit) => (
+                  <li key={benefit} className="flex items-start gap-2 text-[11px] leading-relaxed text-navy">
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal" />
+                    <span>{benefit}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <Link to="/rewards" className="mt-3 flex items-center justify-between rounded-xl bg-surface px-3 py-2 text-[12px] font-bold text-navy">
+            View all rewards
+            <ChevronRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
@@ -224,6 +285,64 @@ function Vital({ label, value, unit, delta, bad }: { label: string; value: strin
       <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
       <p className="mt-1 text-xl font-extrabold text-navy">{value}<span className="text-xs font-medium text-muted-foreground ml-1">{unit}</span></p>
       <p className={`text-[11px] font-semibold mt-0.5 ${bad ? "text-danger" : "text-success"}`}>{delta}</p>
+    </div>
+  );
+}
+
+function FollowUpToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left ${
+        checked ? "border-teal bg-teal/5" : "border-border bg-surface"
+      }`}
+    >
+      <span className="text-[13px] font-semibold text-navy">{label}</span>
+      <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${checked ? "bg-teal text-white" : "bg-muted text-muted-foreground"}`}>
+        {checked ? "Yes" : "No"}
+      </span>
+    </button>
+  );
+}
+
+function SymptomTriageCard({ triage }: { triage: SymptomTriage }) {
+  const toneClass =
+    triage.tone === "danger" ? "border-danger/25 bg-danger/8 text-danger" :
+    triage.tone === "warn" ? "border-warning/30 bg-warning/10 text-warning" :
+    "border-success/25 bg-success/10 text-success";
+
+  return (
+    <div className={`mt-4 rounded-2xl border p-4 ${toneClass}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">AI-assisted triage</p>
+          <p className="mt-1 text-[15px] font-extrabold text-navy">{triage.possibleMatch}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">Urgency</p>
+          <p className="text-2xl font-extrabold text-navy">{triage.urgencyScore}</p>
+        </div>
+      </div>
+      <p className="mt-2 text-[12px] font-bold text-navy">{triage.urgencyLabel}</p>
+      <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{triage.summary}</p>
+      {triage.redFlags.length ? (
+        <div className="mt-3 rounded-xl bg-white/70 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-danger">Red flags selected</p>
+          <p className="mt-1 text-[12px] font-semibold text-navy">{triage.redFlags.join(", ")}</p>
+        </div>
+      ) : null}
+      <ul className="mt-3 space-y-1.5">
+        {triage.nextSteps.slice(0, 3).map((step) => (
+          <li key={step} className="flex items-start gap-2 text-[12px] leading-relaxed text-navy">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
+            <span>{step}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
+        This is not a confirmed diagnosis. If symptoms feel severe or rapidly worsening, seek medical care.
+      </p>
     </div>
   );
 }

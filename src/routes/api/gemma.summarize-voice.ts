@@ -16,18 +16,19 @@ export const Route = createFileRoute("/api/gemma/summarize-voice")({
             transcript?: string;
             species?: string;
             incident?: string;
+            reportType?: string;
           };
           if (!body.transcript?.trim()) {
             return Response.json({ error: "Transcript is required" }, { status: 400 });
           }
 
           const prompt = [
-            "Summarize this farmer voice note for a veterinary incident report.",
+            "Summarize this voice note for a community health incident report.",
             "Keep the summary concise, factual, and non-diagnostic.",
             "Return plain text only. Do not use markdown, headings, bold markers, bullets with asterisks, or placeholder fields.",
-            `Species: ${body.species || "unknown"}. Incident: ${(body.incident || "unknown").replace("-", " ")}.`,
+            `Report type: ${body.reportType || "animal"}. Subject: ${body.species || "unknown"}. Incident: ${(body.incident || "unknown").replace(/-/g, " ")}.`,
             `Transcript: ${body.transcript}`,
-            "Include important animal signs, timing, number affected, location clues, and immediate next steps if mentioned.",
+            "Include important signs or hazards, timing, number affected or vector density, location clues, and immediate next steps if mentioned.",
           ].join("\n");
 
           const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMMA_MODEL}:generateContent`, {

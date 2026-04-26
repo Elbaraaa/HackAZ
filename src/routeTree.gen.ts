@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as ReportRouteImport } from './routes/report'
 import { Route as PublicHealthRouteImport } from './routes/public-health'
 import { Route as MapRouteImport } from './routes/map'
@@ -21,6 +22,11 @@ import { Route as ApiGemmaSummarizeVoiceRouteImport } from './routes/api/gemma.s
 import { Route as ApiGemmaAnalyzeImageRouteImport } from './routes/api/gemma.analyze-image'
 import { Route as ApiBackboardSessionRouteImport } from './routes/api/backboard.session'
 
+const RewardsRoute = RewardsRouteImport.update({
+  id: '/rewards',
+  path: '/rewards',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportRoute = ReportRouteImport.update({
   id: '/report',
   path: '/report',
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/map': typeof MapRoute
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
+  '/rewards': typeof RewardsRoute
   '/api/backboard/session': typeof ApiBackboardSessionRoute
   '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
   '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/map': typeof MapRoute
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
+  '/rewards': typeof RewardsRoute
   '/api/backboard/session': typeof ApiBackboardSessionRoute
   '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
   '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/map': typeof MapRoute
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
+  '/rewards': typeof RewardsRoute
   '/api/backboard/session': typeof ApiBackboardSessionRoute
   '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
   '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/public-health'
     | '/report'
+    | '/rewards'
     | '/api/backboard/session'
     | '/api/gemma/analyze-image'
     | '/api/gemma/summarize-voice'
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/public-health'
     | '/report'
+    | '/rewards'
     | '/api/backboard/session'
     | '/api/gemma/analyze-image'
     | '/api/gemma/summarize-voice'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/public-health'
     | '/report'
+    | '/rewards'
     | '/api/backboard/session'
     | '/api/gemma/analyze-image'
     | '/api/gemma/summarize-voice'
@@ -168,6 +180,7 @@ export interface RootRouteChildren {
   MapRoute: typeof MapRoute
   PublicHealthRoute: typeof PublicHealthRoute
   ReportRoute: typeof ReportRoute
+  RewardsRoute: typeof RewardsRoute
   ApiBackboardSessionRoute: typeof ApiBackboardSessionRoute
   ApiGemmaAnalyzeImageRoute: typeof ApiGemmaAnalyzeImageRoute
   ApiGemmaSummarizeVoiceRoute: typeof ApiGemmaSummarizeVoiceRoute
@@ -175,6 +188,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/rewards': {
+      id: '/rewards'
+      path: '/rewards'
+      fullPath: '/rewards'
+      preLoaderRoute: typeof RewardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/report': {
       id: '/report'
       path: '/report'
@@ -264,6 +284,7 @@ const rootRouteChildren: RootRouteChildren = {
   MapRoute: MapRoute,
   PublicHealthRoute: PublicHealthRoute,
   ReportRoute: ReportRoute,
+  RewardsRoute: RewardsRoute,
   ApiBackboardSessionRoute: ApiBackboardSessionRoute,
   ApiGemmaAnalyzeImageRoute: ApiGemmaAnalyzeImageRoute,
   ApiGemmaSummarizeVoiceRoute: ApiGemmaSummarizeVoiceRoute,

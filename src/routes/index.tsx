@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, BloomyLogo, StatusPill, TopBar } from "@/components/AppShell";
-import { Activity, AlertTriangle, Bug, ChevronRight, Heart, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { Activity, AlertTriangle, Bug, ChevronRight, Gift, Heart, MapPin, Sparkles, Users } from "lucide-react";
 import { activeSignals, useStore } from "@/lib/store";
 import { InteractiveRegionMap } from "@/components/InteractiveRegionMap";
 import { useMemo } from "react";
@@ -55,7 +55,7 @@ function Index() {
 
         <div className="mt-3 grid grid-cols-2 gap-3">
           <Link to="/report" className="flex items-center justify-center gap-2 rounded-xl bg-card border border-border py-3 text-[13px] font-semibold text-navy shadow-soft">
-            <Bug className="w-4 h-4 text-warning" /> Report Animal Incident
+            <Bug className="w-4 h-4 text-warning" /> Report Incident
           </Link>
           <Link to="/map" className="flex items-center justify-center gap-2 rounded-xl bg-card border border-border py-3 text-[13px] font-semibold text-navy shadow-soft">
             <MapPin className="w-4 h-4 text-teal" /> Community Signals
@@ -93,16 +93,16 @@ function Index() {
 
       {/* Streak / rewards */}
       <section className="px-5 mt-5">
-        <div className="rounded-2xl bg-card border border-border p-4 shadow-soft flex items-center gap-3">
+        <Link to="/rewards" className="rounded-2xl bg-card border border-border p-4 shadow-soft flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-gradient-success grid place-items-center text-white">
-            <ShieldCheck className="w-5 h-5" />
+            <Gift className="w-5 h-5" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-navy">{streak}-day check-in streak</p>
-            <p className="text-xs text-muted-foreground">{points} community impact points · partner rewards unlocking</p>
+            <p className="text-sm font-semibold text-navy">Rewards & partner benefits</p>
+            <p className="text-xs text-muted-foreground">{streak}-day streak · {points} impact points · benefit paths unlocked</p>
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </div>
+        </Link>
       </section>
 
       {/* Value props */}

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { InteractiveRegionMap } from "@/components/InteractiveRegionMap";
 import { activeSignals, type CommunitySignal, useStore } from "@/lib/store";
+import { formatRelativeTime } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Bug, Droplets, Flame, Heart, Hospital } from "lucide-react";
 
@@ -19,6 +20,7 @@ const FILTERS = [
   { id: "all", label: "All Signals" },
   { id: "symptom-cluster", label: "Symptoms" },
   { id: "animal", label: "Animal" },
+  { id: "environmental", label: "Environment" },
   { id: "mosquito", label: "Mosquito" },
   { id: "heat", label: "Heat" },
 ] as const;
@@ -135,7 +137,7 @@ function MapView() {
       </section>
 
       <p className="px-5 mt-4 text-[10px] text-center text-muted-foreground">
-        Resource pins are representative examples for demonstration. Doctor-reviewed resolved cases are removed from this live map.
+        Resource pins are representative examples for demonstration. Reviewer-resolved cases are removed from this live map.
       </p>
     </AppShell>
   );
@@ -150,6 +152,7 @@ function CompactSignalRow({ signal }: { signal: CommunitySignal }) {
         <p className="truncate text-[12px] font-bold text-navy">{signal.title}</p>
         <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
           <span className="text-muted-foreground">ZIP {signal.zip}</span>
+          <span className="text-muted-foreground">{formatRelativeTime(signal.createdAt)}</span>
           <span className="text-muted-foreground">{formatCaseDate(signal.createdAt)}</span>
           <span className={tone}>{signal.severity}</span>
           <span className="text-danger">Rank {signal.rank}</span>
@@ -194,6 +197,7 @@ function iconFor(t: CommunitySignal["type"]) {
   switch (t) {
     case "symptom-cluster": return <AlertTriangle className="w-3.5 h-3.5" />;
     case "animal": return <Bug className="w-3.5 h-3.5" />;
+    case "environmental": return <Droplets className="w-3.5 h-3.5" />;
     case "mosquito": return <Droplets className="w-3.5 h-3.5" />;
     case "heat": return <Flame className="w-3.5 h-3.5" />;
     case "healthy-report": return <Heart className="w-3.5 h-3.5" />;
@@ -204,6 +208,7 @@ function iconFor(t: CommunitySignal["type"]) {
 function colorFor(s: CommunitySignal) {
   if (s.type === "healthy-report") return "oklch(0.62 0.13 155)";
   if (s.type === "clinic") return "oklch(0.55 0.12 195)";
+  if (s.type === "environmental") return "oklch(0.55 0.13 175)";
   if (s.type === "mosquito") return "oklch(0.55 0.13 175)";
   if (s.type === "heat") return "oklch(0.78 0.16 75)";
   if (s.severity === "high") return "oklch(0.62 0.22 25)";

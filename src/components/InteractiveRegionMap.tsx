@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type mapboxgl from "mapbox-gl";
 import type { CommunitySignal } from "@/lib/store";
+import { formatRelativeTime } from "@/lib/utils";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 export function InteractiveRegionMap({
@@ -89,7 +90,7 @@ export function InteractiveRegionMap({
         details.textContent = `${signal.illness.replace("-", " ")} - ${signal.severity} - rank ${signal.rank}`;
         const expiry = document.createElement("p");
         const reported = document.createElement("p");
-        reported.textContent = `Reported ${formatCaseDate(signal.createdAt)}`;
+        reported.textContent = `Reported ${formatRelativeTime(signal.createdAt)} (${formatCaseDate(signal.createdAt)})`;
         expiry.textContent = `Expires ${new Date(signal.expiresAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric" })}`;
         popupNode.append(title, details, reported, expiry);
 
@@ -245,17 +246,17 @@ function clusterSignals(signals: CommunitySignal[]): SignalCluster[] {
 function mergeDistanceMiles(cluster: SignalCluster, signal: CommunitySignal) {
   const base =
     signal.type === "animal" ? 0.9 :
-    signal.type === "mosquito" || signal.type === "heat" ? 1.15 :
+    signal.type === "environmental" || signal.type === "mosquito" || signal.type === "heat" ? 1.15 :
     0.72;
   const densityBoost = Math.min(Math.sqrt(cluster.count) * 0.16, 0.58);
   return base + densityBoost;
 }
 
 function radiusMilesForCluster(cluster: SignalCluster) {
-  const singleBase = cluster.type === "animal" || cluster.type === "mosquito" ? 0.5 : 0.38;
+  const singleBase = cluster.type === "animal" || cluster.type === "environmental" || cluster.type === "mosquito" ? 0.5 : 0.38;
   const densityBoost = Math.sqrt(Math.max(cluster.count - 1, 0)) * 0.28;
   const riskBoost = cluster.rank >= 78 ? 0.45 : cluster.rank >= 55 ? 0.22 : 0;
-  const maxRadius = cluster.type === "mosquito" || cluster.type === "heat" ? 3.6 : 2.8;
+  const maxRadius = cluster.type === "environmental" || cluster.type === "mosquito" || cluster.type === "heat" ? 3.6 : 2.8;
   return Number(Math.min(maxRadius, singleBase + densityBoost + riskBoost).toFixed(2));
 }
 

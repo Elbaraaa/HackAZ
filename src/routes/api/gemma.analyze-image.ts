@@ -17,6 +17,7 @@ export const Route = createFileRoute("/api/gemma/analyze-image")({
             mimeType?: string;
             species?: string;
             incident?: string;
+            reportType?: string;
             notes?: string;
             voiceSummary?: string;
           };
@@ -26,12 +27,12 @@ export const Route = createFileRoute("/api/gemma/analyze-image")({
           }
 
           const prompt = [
-            "You are assisting a farmer with an animal health incident report.",
-            "Analyze the image for visible clues only. Do not diagnose disease.",
-            `Species: ${body.species || "unknown"}. Incident: ${(body.incident || "unknown").replace("-", " ")}.`,
+            "You are assisting with a community health incident report.",
+            "Analyze the image for visible clues only. Do not diagnose disease or make certainty claims.",
+            `Report type: ${body.reportType || "animal"}. Subject: ${body.species || "unknown"}. Incident: ${(body.incident || "unknown").replace(/-/g, " ")}.`,
             body.notes ? `Reporter notes: ${body.notes}` : "",
             body.voiceSummary ? `Voice summary: ${body.voiceSummary}` : "",
-            "Return concise sections: Visible concerns, Urgency, Farmer next steps, When to call a vet, Safety notes, Limitations.",
+            "Return concise sections: Visible concerns, Urgency, Next steps, Who to contact, Safety notes, Limitations.",
             "Return plain text only. Do not use markdown, headings with #, bold markers, or asterisk bullets.",
           ].filter(Boolean).join("\n");
 

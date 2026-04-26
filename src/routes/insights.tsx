@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { useStore, computeRisk } from "@/lib/store";
-import { AlertTriangle, Award, ChevronRight, Cloud, Droplets, Flame, Gift, Heart, Hospital, Phone, ShieldCheck, Sparkles, Thermometer } from "lucide-react";
+import { rewardAudience } from "@/lib/rewards";
+import { analyzeSymptoms, type SymptomTriage } from "@/lib/symptom-triage";
+import { ChevronRight, Cloud, Droplets, Flame, Gift, Heart, Hospital, Phone, ShieldCheck, Sparkles, Stethoscope, Thermometer } from "lucide-react";
 
 type InsightsSearch = { id?: string };
 
@@ -29,12 +31,11 @@ function Insights() {
   const checkIn = useStore((s) => (id ? s.checkIns.find((c) => c.id === id) : s.checkIns[0]));
   const streak = useStore((s) => s.streak);
   const points = useStore((s) => s.points);
-  const signals = useStore((s) => s.signals);
   const zip = checkIn?.zip ?? "85719";
 
   // Healthy path → community baseline value
   if (!checkIn || checkIn.feeling === "healthy") {
-    return <HealthyView zip={zip} streak={streak} points={points} signals={signals} />;
+    return <HealthyView zip={zip} streak={streak} points={points} />;
   }
 
   const r = computeRisk({
@@ -44,6 +45,14 @@ function Insights() {
     zip: checkIn.zip,
   });
   const meta = RISK_META[r.level];
+  const supportReward = rewardAudience("symptom");
+  const triage = analyzeSymptoms({
+    feeling: checkIn.feeling,
+    symptoms: checkIn.symptoms,
+    vitals: checkIn.vitals,
+    zip: checkIn.zip,
+    otherSymptom: checkIn.otherSymptom,
+  });
 
   return (
     <AppShell>
@@ -69,6 +78,10 @@ function Insights() {
       </section>
 
       <section className="px-5 mt-5">
+        <DetailedTriagePanel triage={triage} />
+      </section>
+
+      <section className="px-5 mt-5">
         <p className="text-[15px] font-bold text-navy">Why this score</p>
         <ul className="mt-2 space-y-2">
           {r.factors.map((f) => (
@@ -85,6 +98,24 @@ function Insights() {
           <ActionRow icon={<Heart className="w-4 h-4" />} title="Hydrate & rest 24h" body="Reduce activity until vitals normalize." />
           <ActionRow icon={<Thermometer className="w-4 h-4" />} title="Re-check tomorrow" body="One more daily signal improves accuracy." />
           {r.level !== "low" && <ActionRow icon={<Phone className="w-4 h-4" />} title="CarePoint Telehealth available" body="Consultation under 15 min — covered for ZIP 85719." />}
+        </div>
+      </section>
+
+      <section className="px-5 mt-6">
+        <div className="rounded-2xl bg-warning/10 border border-warning/30 p-4">
+          <div className="flex items-start gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-warning/15 text-warning">
+              <Gift className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-navy">{supportReward.shortTitle}</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-navy">{supportReward.summary}</p>
+            </div>
+          </div>
+          <Link to="/rewards" className="mt-3 flex items-center justify-between rounded-xl bg-white/70 px-3 py-2 text-[12px] font-bold text-navy">
+            View care support rewards
+            <ChevronRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
@@ -107,8 +138,7 @@ function Insights() {
   );
 }
 
-function HealthyView({ zip, streak, points, signals }: { zip: string; streak: number; points: number; signals: ReturnType<typeof useStore<any>> }) {
-  const local = (signals as any[]).filter((s) => s.zip === zip || s.severity !== "low");
+function HealthyView({ zip, streak, points }: { zip: string; streak: number; points: number }) {
   return (
     <AppShell>
       <TopBar title="Insight" back="/" pill={<StatusPill tone="ok">Healthy Baseline</StatusPill>} />
@@ -167,9 +197,9 @@ function HealthyView({ zip, streak, points, signals }: { zip: string; streak: nu
             <Gift className="w-3 h-3"/> HealthBridge Partner Reward
           </div>
           <p className="mt-2 text-[15px] font-bold leading-snug">
-            Thanks to your {streak}-day reporting streak, you've earned 20% off wellness items at your local HealthBridge.
+            Thanks to your {streak}-day reporting streak, you can unlock wellness discounts, gym passes, and local health insights.
           </p>
-          <button className="mt-3 w-full rounded-xl bg-white text-navy py-2.5 text-sm font-semibold">Claim Reward</button>
+          <Link to="/rewards" className="mt-3 block w-full rounded-xl bg-white py-2.5 text-center text-sm font-semibold text-navy">View Rewards</Link>
         </div>
         <p className="mt-2 text-[10px] text-center text-muted-foreground">Representative partner for demonstration purposes.</p>
       </section>
@@ -191,6 +221,54 @@ function ActionRow({ icon, title, body }: { icon: React.ReactNode; title: string
         <p className="text-[13px] font-semibold text-navy">{title}</p>
         <p className="text-[12px] text-muted-foreground">{body}</p>
       </div>
+    </div>
+  );
+}
+
+function DetailedTriagePanel({ triage }: { triage: SymptomTriage }) {
+  const toneClass =
+    triage.tone === "danger" ? "border-danger/25 bg-danger/8" :
+    triage.tone === "warn" ? "border-warning/30 bg-warning/10" :
+    "border-success/25 bg-success/10";
+  const scoreClass =
+    triage.tone === "danger" ? "text-danger" :
+    triage.tone === "warn" ? "text-warning" :
+    "text-success";
+
+  return (
+    <div className={`rounded-2xl border p-4 ${toneClass}`}>
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/70 text-teal">
+          <Stethoscope className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Quick AI triage</p>
+          <p className="mt-1 text-[15px] font-bold text-navy">{triage.possibleMatch}</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{triage.summary}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Urgency</p>
+          <p className={`text-2xl font-extrabold ${scoreClass}`}>{triage.urgencyScore}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-xl bg-white/70 p-3">
+        <p className={`text-[12px] font-bold ${scoreClass}`}>{triage.urgencyLabel}</p>
+        <ul className="mt-2 space-y-1.5">
+          {triage.nextSteps.map((step) => (
+            <li key={step} className="flex items-start gap-2 text-[12px] leading-relaxed text-navy">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
+              <span>{step}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {triage.redFlags.length ? (
+        <p className="mt-3 text-[11px] font-semibold text-danger">
+          Red flags: {triage.redFlags.join(", ")}
+        </p>
+      ) : null}
     </div>
   );
 }

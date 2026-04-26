@@ -1,13 +1,13 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Activity, Map as MapIcon, Stethoscope, Sparkles, Home } from "lucide-react";
+import { Activity, Gift, Map as MapIcon, Stethoscope, Home } from "lucide-react";
 import { type ReactNode, useId } from "react";
 
 const tabs = [
   { to: "/", label: "Home", icon: Home },
   { to: "/checkin", label: "Check-In", icon: Activity },
   { to: "/map", label: "Map", icon: MapIcon },
-  { to: "/insights", label: "Insights", icon: Sparkles },
-  { to: "/doctor", label: "Doctor", icon: Stethoscope },
+  { to: "/rewards", label: "Rewards", icon: Gift },
+  { to: "/doctor", label: "Review", icon: Stethoscope },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {

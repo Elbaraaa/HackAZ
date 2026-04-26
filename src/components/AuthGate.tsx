@@ -37,7 +37,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
             Sign in to continue.
           </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-muted-foreground">
-            Use your account to access patient check-ins, doctor review tools, or admin analytics.
+            Use your account to access check-ins, review tools, or admin analytics.
           </p>
 
           <div className="mt-8 space-y-3">

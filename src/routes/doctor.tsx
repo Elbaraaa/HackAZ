@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { activeSignals, store, useStore } from "@/lib/store";
-import { Activity, Bell, Check, ChevronRight, X, AlertTriangle, TrendingUp, ClipboardCheck, ShieldAlert, CalendarDays, Image as ImageIcon } from "lucide-react";
+import { formatRelativeTime } from "@/lib/utils";
+import { rewardAudience } from "@/lib/rewards";
+import { Activity, Bell, Check, ChevronRight, X, AlertTriangle, TrendingUp, ClipboardCheck, ShieldAlert, CalendarDays, Image as ImageIcon, Gift } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -9,11 +11,11 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/doctor")({
   head: () => ({
     meta: [
-      { title: "Doctor Dashboard - Bloomy" },
+      { title: "Review Hub - Bloomy" },
       { name: "description", content: "Validate community alerts with one tap." },
     ],
   }),
-  component: Doctor,
+  component: ReviewHub,
 });
 
 const trend = Array.from({ length: 14 }).map((_, i) => ({
@@ -22,57 +24,121 @@ const trend = Array.from({ length: 14 }).map((_, i) => ({
   baseline: 18,
 }));
 
-function Doctor() {
+type ReviewLane = "clinical" | "veterinary" | "environmental";
+
+const REVIEW_LANES: { id: ReviewLane; label: string; role: string }[] = [
+  { id: "clinical", label: "Clinical", role: "Clinical Reviewer" },
+  { id: "veterinary", label: "Vet", role: "Veterinary Reviewer" },
+  { id: "environmental", label: "Environment", role: "Environmental Health Officer" },
+];
+
+function ReviewHub() {
   const signals = useStore((s) => s.signals);
   const liveSignals = useMemo(() => activeSignals(signals), [signals]);
   const [reports, setReports] = useState<Record<string, string>>({});
-  const [doctorType, setDoctorType] = useState<"general" | "animal">("general");
+  const [reviewLane, setReviewLane] = useState<ReviewLane>("clinical");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const clusters = liveSignals.filter((s) =>
-    doctorType === "animal"
+    reviewLane === "veterinary"
       ? s.type === "animal"
-      : s.type === "symptom-cluster" || s.type === "mosquito" || s.type === "heat",
+      : reviewLane === "environmental"
+        ? s.type === "environmental" || s.type === "mosquito" || s.type === "heat"
+        : s.type === "symptom-cluster",
   );
   const highRisk = clusters.filter((s) => s.severity === "high").length;
+  const activeLane = REVIEW_LANES.find((lane) => lane.id === reviewLane)!;
+  const reviewerReward = rewardAudience("reviewer");
+  const notifications = clusters
+    .filter((signal) => signal.severity === "high" || signal.evidencePhoto || signal.voiceSummary)
+    .slice(0, 4);
 
   const decide = (id: string, action: "monitor" | "resolved" | "dismissed", contagious: boolean) => {
     const summary = reports[id]?.trim() || defaultReport(action);
-    store.doctorReviewSignal(id, { action, contagious, summary, reviewer: "Dr. Bloomy" });
+    store.doctorReviewSignal(id, { action, contagious, summary, reviewer: activeLane.role });
     toast.success(action === "monitor" ? "Case note saved" : "Case removed from live map");
   };
 
   return (
     <AppShell>
-      <TopBar title="Bloomy" back="/" pill={<StatusPill tone="live">Doctor Mode</StatusPill>} right={
-        <button className="w-9 h-9 rounded-full grid place-items-center bg-muted relative">
-          <Bell className="w-4 h-4"/>
-          {highRisk ? <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger"/> : null}
-        </button>
+      <TopBar title="Bloomy" back="/" pill={<StatusPill tone="live">Review Hub</StatusPill>} right={
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setNotificationsOpen((open) => !open)}
+            className="w-9 h-9 rounded-full grid place-items-center bg-muted relative"
+            aria-label="Notifications"
+          >
+            <Bell className="w-4 h-4"/>
+            {notifications.length ? <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger"/> : null}
+          </button>
+          {notificationsOpen ? (
+            <div className="absolute right-0 top-11 z-50 w-72 rounded-2xl border border-border bg-card p-3 shadow-elevated">
+              <div className="flex items-center justify-between">
+                <p className="text-[13px] font-bold text-navy">Notifications</p>
+                <span className="rounded-full bg-danger/10 px-2 py-1 text-[10px] font-bold text-danger">{notifications.length}</span>
+              </div>
+              <div className="mt-2 space-y-2">
+                {notifications.length ? notifications.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setReports((prev) => ({ ...prev, [item.id]: prev[item.id] ?? "" }));
+                      setNotificationsOpen(false);
+                    }}
+                    className="w-full rounded-xl bg-surface p-2 text-left"
+                  >
+                    <p className="truncate text-[12px] font-bold text-navy">{item.title}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{formatRelativeTime(item.createdAt)} · Rank {item.rank} · {item.severity} · ZIP {item.zip}</p>
+                  </button>
+                )) : (
+                  <p className="rounded-xl bg-success/10 p-3 text-[12px] font-semibold text-success">No urgent notifications in this lane.</p>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
       }/>
 
       <section className="px-5 pt-2">
-        <h1 className="text-3xl font-extrabold tracking-tight text-navy">Surveillance</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight text-navy">Review Hub</h1>
         <p className="text-[13px] text-muted-foreground mt-1">
-          Select a clinical review lane to see the right report queue. Auth0 is disabled, so this dashboard is open in the demo.
+          Select a review lane to see the right queue for clinical, veterinary, or environmental health follow-up.
         </p>
       </section>
 
       <section className="px-5 mt-4">
-        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1">
-          {[
-            { id: "general", label: "General Doctor" },
-            { id: "animal", label: "Animal / Vet" },
-          ].map((option) => (
+        <div className="grid grid-cols-3 gap-2 rounded-2xl bg-muted p-1">
+          {REVIEW_LANES.map((option) => (
             <button
               key={option.id}
-              onClick={() => setDoctorType(option.id as "general" | "animal")}
+              onClick={() => setReviewLane(option.id)}
               className={`rounded-xl py-2.5 text-[12px] font-bold transition-colors ${
-                doctorType === option.id ? "bg-card text-navy shadow-soft" : "text-muted-foreground"
+                reviewLane === option.id ? "bg-card text-navy shadow-soft" : "text-muted-foreground"
               }`}
             >
               {option.label}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="px-5 mt-4">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <div className="flex items-start gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-warning/10 text-warning">
+              <Gift className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-navy">{reviewerReward.shortTitle}</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{reviewerReward.summary}</p>
+            </div>
+          </div>
+          <Link to="/rewards" className="mt-3 flex items-center justify-between rounded-xl bg-surface px-3 py-2 text-[12px] font-bold text-navy">
+            See reviewer benefits
+            <ChevronRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
@@ -100,7 +166,7 @@ function Doctor() {
         <div className="rounded-2xl bg-gradient-dark-card text-white p-4 shadow-elevated">
           <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">48h Demand Forecast</p>
           <p className="mt-1 text-3xl font-extrabold">{highRisk ? "High" : "Moderate"}</p>
-          <p className="mt-1 text-[11px] opacity-80 leading-relaxed">Based on the selected {doctorType === "animal" ? "animal incident" : "human health"} review queue.</p>
+          <p className="mt-1 text-[11px] opacity-80 leading-relaxed">Based on the selected {activeLane.role.toLowerCase()} queue.</p>
         </div>
         <div className="rounded-2xl bg-card border border-border p-4 shadow-soft">
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Review Queue</p>
@@ -110,7 +176,7 @@ function Doctor() {
       </section>
 
       <section className="px-5 mt-5">
-        <p className="text-[15px] font-bold text-navy">{doctorType === "animal" ? "Animal / Vet Case Review" : "General Doctor Case Review"}</p>
+        <p className="text-[15px] font-bold text-navy">{activeLane.role} Case Review</p>
         <div className="mt-3 space-y-3">
           {clusters.length ? clusters.map((c) => (
             <div key={c.id} className="rounded-2xl bg-card border border-border p-4 shadow-soft">
@@ -124,22 +190,25 @@ function Doctor() {
                   <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">{c.detail}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wider">
                     <span className="rounded bg-muted px-1.5 py-0.5 text-navy">ZIP {c.zip}</span>
+                    <span className="inline-flex items-center gap-1 rounded bg-teal/10 px-1.5 py-0.5 text-teal"><CalendarDays className="h-3 w-3" /> {formatRelativeTime(c.createdAt)}</span>
                     <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-navy"><CalendarDays className="h-3 w-3" /> {formatCaseDate(c.createdAt)}</span>
+                    {c.affectedAnimals ? <span className="rounded bg-warning/10 px-1.5 py-0.5 text-warning">{c.affectedAnimals} affected</span> : null}
+                    {c.vectorCount ? <span className="rounded bg-teal/10 px-1.5 py-0.5 text-teal">{c.vectorCount} vectors</span> : null}
                     <span className="text-teal">{c.illness.replace("-", " ")}</span>
                     <span className={c.severity === "high" ? "text-danger" : "text-warning"}>{c.severity}</span>
                   </div>
                 </div>
               </div>
 
-              {doctorType === "animal" && (c.evidencePhoto || c.photoAnalysis || c.voiceSummary) ? (
+              {(c.evidencePhoto || c.photoAnalysis || c.voiceSummary) ? (
                 <div className="mt-3 rounded-xl border border-border bg-surface p-3">
                   <p className="flex items-center gap-1.5 text-[12px] font-bold text-navy">
-                    <ImageIcon className="h-3.5 w-3.5 text-teal" /> Vet case evidence
+                    <ImageIcon className="h-3.5 w-3.5 text-teal" /> {c.type === "animal" ? "Vet case evidence" : "Incident evidence"}
                   </p>
                   {c.evidencePhoto?.previewUrl ? (
                     <img
                       src={c.evidencePhoto.previewUrl}
-                      alt="Animal incident evidence"
+                      alt="Incident evidence"
                       className="mt-2 h-44 w-full rounded-lg object-cover"
                     />
                   ) : c.evidencePhoto ? (
@@ -164,13 +233,13 @@ function Doctor() {
                 value={reports[c.id] ?? ""}
                 onChange={(e) => setReports((prev) => ({ ...prev, [c.id]: e.target.value }))}
                 rows={3}
-                placeholder="Write doctor report: diagnosis notes, contagious risk, follow-up plan..."
+                placeholder="Write review note: risk assessment, follow-up plan, escalation details..."
                 className="mt-3 w-full rounded-xl bg-surface border border-border p-3 text-[12px] focus:outline-none focus:border-teal"
               />
 
               {c.doctorReport ? (
                 <div className="mt-3 rounded-xl bg-success/10 border border-success/20 p-3">
-                  <p className="text-[12px] font-bold text-success flex items-center gap-1"><ClipboardCheck className="w-3.5 h-3.5"/> Latest doctor note</p>
+                  <p className="text-[12px] font-bold text-success flex items-center gap-1"><ClipboardCheck className="w-3.5 h-3.5"/> Latest review note</p>
                   <p className="mt-1 text-[12px] text-navy leading-relaxed">{c.doctorReport.summary}</p>
                 </div>
               ) : null}
@@ -194,13 +263,13 @@ function Doctor() {
         <p className="text-[15px] font-bold text-navy">Recommended Actions</p>
         <div className="mt-3 space-y-2">
           <div className="rounded-2xl bg-card border border-border p-4 shadow-soft">
-            <p className="text-[13px] font-bold text-navy">{doctorType === "animal" ? "Coordinate veterinary follow-up" : "Prepare respiratory testing resources"}</p>
-            <p className="text-[12px] text-muted-foreground mt-1">{doctorType === "animal" ? "Animal reports are routed separately for veterinary review and zoonotic monitoring." : "General doctors see symptom, vector-borne, and heat-related human health signals."}</p>
+            <p className="text-[13px] font-bold text-navy">{recommendedAction(reviewLane).title}</p>
+            <p className="text-[12px] text-muted-foreground mt-1">{recommendedAction(reviewLane).body}</p>
             <button className="mt-3 rounded-lg bg-teal text-white px-3 py-2 text-[12px] font-semibold">Notify Inventory Team</button>
           </div>
           <div className="rounded-2xl bg-warning/10 border border-warning/30 p-4">
             <p className="text-[13px] font-bold text-warning flex items-center gap-1"><AlertTriangle className="w-4 h-4"/> Reports auto-expire</p>
-            <p className="text-[12px] text-navy mt-1">High-risk cases stay live for 96h, moderate for 72h, and low for 36h unless a doctor resolves or dismisses them sooner.</p>
+            <p className="text-[12px] text-navy mt-1">High-risk cases stay live for 96h, moderate for 72h, and low for 36h unless a reviewer resolves or dismisses them sooner.</p>
           </div>
         </div>
         <Link to="/public-health" className="mt-4 w-full inline-flex items-center justify-between rounded-2xl bg-card border border-border p-4">
@@ -216,6 +285,25 @@ function defaultReport(action: "monitor" | "resolved" | "dismissed") {
   if (action === "monitor") return "Case reviewed. Symptoms may be contagious; keep on live map for continued surveillance.";
   if (action === "resolved") return "Patient or region appears recovered and non-contagious. Removed from live outbreak map.";
   return "Reviewed as non-actionable or duplicate signal. Removed from live outbreak map.";
+}
+
+function recommendedAction(lane: ReviewLane) {
+  if (lane === "veterinary") {
+    return {
+      title: "Coordinate veterinary follow-up",
+      body: "Animal reports are routed separately for veterinary review and zoonotic monitoring.",
+    };
+  }
+  if (lane === "environmental") {
+    return {
+      title: "Dispatch environmental health review",
+      body: "Environmental Health Officers review water, flooding, and vector reports for exposure risk and local response.",
+    };
+  }
+  return {
+    title: "Prepare clinical follow-up",
+    body: "Clinical reviewers see symptom signals and care-seeking patterns that may need health guidance or escalation.",
+  };
 }
 
 function formatCaseDate(value: string) {

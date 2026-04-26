@@ -1,10 +1,11 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { useEffect, useRef, useState } from "react";
-import { Camera, Mic, Wifi, WifiOff, AlertTriangle, ShieldAlert, FileText, Send, LocateFixed, X, Square, LoaderCircle, Sparkles } from "lucide-react";
-import { store, type AnimalIncident, type RiskLevel } from "@/lib/store";
+import { Camera, Mic, Wifi, WifiOff, AlertTriangle, ShieldAlert, FileText, Send, LocateFixed, X, Square, LoaderCircle, Sparkles, Droplets, Bug, Gift, ChevronRight } from "lucide-react";
+import { store, type AnimalIncident, type EnvironmentalIncident, type RiskLevel } from "@/lib/store";
 import { requestApproxLocation, type ApproxLocation } from "@/lib/location";
 import { analyzeIncidentImageWithGemma, summarizeVoiceNoteWithGemma } from "@/lib/gemma";
+import { rewardAudience } from "@/lib/rewards";
 import { toast } from "sonner";
 
 type BrowserSpeechRecognition = {
@@ -38,8 +39,8 @@ declare global {
 export const Route = createFileRoute("/report")({
   head: () => ({
     meta: [
-      { title: "Report Animal Incident - Bloomy" },
-      { name: "description", content: "Report animal incidents — farmers and veterinarians." },
+      { title: "Report Incident - Bloomy" },
+      { name: "description", content: "Report animal and environmental incidents for community health review." },
     ],
   }),
   component: Report,
@@ -61,11 +62,23 @@ const INCIDENTS = [
   { id: "multiple-affected", label: "Multiple Animals Affected", icon: AlertTriangle },
 ] as const;
 
+const ENVIRONMENTAL_INCIDENTS = [
+  { id: "water-flooding", label: "Water Flooding", icon: Droplets },
+  { id: "water-contamination", label: "Water Contamination", icon: ShieldAlert },
+  { id: "vector-spotting", label: "Vector Spotting", icon: Bug },
+  { id: "other", label: "Other", icon: FileText },
+] as const;
+
 function Report() {
   const nav = useNavigate();
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const [reportMode, setReportMode] = useState<"animal" | "environmental">("animal");
   const [species, setSpecies] = useState<AnimalIncident["species"]>("cattle");
   const [incident, setIncident] = useState<AnimalIncident["incident"]>("sudden-sickness");
+  const [environmentalIncident, setEnvironmentalIncident] = useState<EnvironmentalIncident["type"]>("water-flooding");
+  const [vectorCount, setVectorCount] = useState("1");
+  const [incidentDate, setIncidentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [affectedAnimals, setAffectedAnimals] = useState("1");
   const [notes, setNotes] = useState("");
   const [zip, setZip] = useState("85629");
   const [offline, setOffline] = useState(false);
@@ -80,7 +93,11 @@ function Report() {
   const [approxLocation, setApproxLocation] = useState<ApproxLocation | undefined>();
   const [locating, setLocating] = useState(false);
 
-  const triage = computeTriage(incident, species);
+  const triage = reportMode === "animal" ? computeTriage(incident, species) : computeEnvironmentalTriage(environmentalIncident, vectorCount);
+  const activeReward = rewardAudience(reportMode === "animal" ? "farmer" : "environmental");
+  const gemmaContext = reportMode === "animal"
+    ? { incident, species, reportType: "animal" as const }
+    : { incident: environmentalIncident, species: "environmental", reportType: "environmental" as const };
 
   useEffect(() => {
     if (!photoFile) {
@@ -105,7 +122,7 @@ function Report() {
     let cancelled = false;
     setPhotoAnalysis("");
     setIsAnalyzingPhoto(true);
-    analyzeIncidentImageWithGemma(photoFile, { incident, species }).then((analysis) => {
+    analyzeIncidentImageWithGemma(photoFile, gemmaContext).then((analysis) => {
       if (!cancelled) setPhotoAnalysis(analysis);
     }).catch(() => {
       if (!cancelled) toast.error("Gemma could not read the photo right now");
@@ -116,7 +133,7 @@ function Report() {
     return () => {
       cancelled = true;
     };
-  }, [photoFile, incident, species]);
+  }, [photoFile, reportMode, incident, species, environmentalIncident]);
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
 
@@ -134,10 +151,37 @@ function Report() {
   };
 
   const submit = () => {
+    const affectedCount = Math.max(1, Number.parseInt(affectedAnimals, 10) || 1);
+    const vectorTotal = Math.max(1, Number.parseInt(vectorCount, 10) || 1);
+
+    if (reportMode === "environmental") {
+      const env: EnvironmentalIncident = {
+        id: `env-${Date.now()}`,
+        date: dateInputToIso(incidentDate),
+        zip,
+        type: environmentalIncident,
+        vectorCount: environmentalIncident === "vector-spotting" ? vectorTotal : undefined,
+        notes,
+        urgency: triage.urgency,
+        approxLocation,
+        photo: photoFile
+          ? { name: photoFile.name, type: photoFile.type, size: photoFile.size, previewUrl: photoPreviewUrl }
+          : undefined,
+        photoAnalysis: photoAnalysis || undefined,
+        voiceTranscript: voiceTranscript || undefined,
+        voiceSummary: voiceSummary || undefined,
+      };
+      store.addEnvironmentalIncident(env);
+      toast.success(offline ? "Saved offline - will sync when connected" : "Shared with public health review");
+      setTimeout(() => nav({ to: "/map" }), 500);
+      return;
+    }
+
     const ai: AnimalIncident = {
       id: `ai-${Date.now()}`,
-      date: new Date().toISOString(),
+      date: dateInputToIso(incidentDate),
       zip, species, incident, notes,
+      affectedAnimals: affectedCount,
       urgency: triage.urgency,
       approxLocation,
       photo: photoFile
@@ -194,7 +238,7 @@ function Report() {
 
     setIsSummarizing(true);
     try {
-      const summary = await summarizeVoiceNoteWithGemma(voiceTranscript, { incident, species });
+      const summary = await summarizeVoiceNoteWithGemma(voiceTranscript, gemmaContext);
       setVoiceSummary(summary);
       toast.success("Gemma summary ready");
     } finally {
@@ -212,7 +256,53 @@ function Report() {
 
       <section className="px-5 pt-2">
         <h1 className="text-[28px] font-extrabold tracking-tight text-navy">Report Incident</h1>
-        <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">Provide details about the affected animal to initiate triage.</p>
+        <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">Report animal health or environmental incidents with date, location, photo evidence, and voice notes.</p>
+      </section>
+
+      <section className="px-5 mt-4">
+        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1">
+          {[
+            { id: "animal", label: "Animal" },
+            { id: "environmental", label: "Environmental" },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setReportMode(option.id as "animal" | "environmental")}
+              className={`rounded-xl py-2.5 text-[12px] font-bold transition-colors ${
+                reportMode === option.id ? "bg-card text-navy shadow-soft" : "text-muted-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="px-5 mt-4">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <div className="flex items-start gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal/10 text-teal">
+              <Gift className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-navy">{activeReward.shortTitle}</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{activeReward.summary}</p>
+            </div>
+          </div>
+          <ul className="mt-3 space-y-1">
+            {activeReward.benefits.slice(0, 2).map((benefit) => (
+              <li key={benefit} className="flex items-start gap-2 text-[11px] leading-relaxed text-navy">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal" />
+                <span>{benefit}</span>
+              </li>
+            ))}
+          </ul>
+          <Link to="/rewards" className="mt-3 flex items-center justify-between rounded-xl bg-surface px-3 py-2 text-[12px] font-bold text-navy">
+            View related benefits
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
       </section>
 
       <section className="px-5 mt-5">
@@ -268,6 +358,7 @@ function Report() {
         {!isAnalyzingPhoto && photoAnalysis ? <ImageAnalysisCard analysis={photoAnalysis} /> : null}
       </section>
 
+      {reportMode === "animal" ? (
       <section className="px-5 mt-5">
         <p className="text-[15px] font-bold text-navy">Species</p>
         <div className="mt-2 grid grid-cols-3 gap-2">
@@ -282,21 +373,71 @@ function Report() {
           })}
         </div>
       </section>
+      ) : null}
 
       <section className="px-5 mt-5">
-        <p className="text-[15px] font-bold text-navy">Incident Details</p>
+        <p className="text-[15px] font-bold text-navy">{reportMode === "animal" ? "Incident Details" : "Environmental Incident"}</p>
         <div className="mt-2 space-y-2">
-          {INCIDENTS.map((i) => {
+          {(reportMode === "animal" ? INCIDENTS : ENVIRONMENTAL_INCIDENTS).map((i) => {
             const Icon = i.icon;
-            const a = incident === i.id;
+            const a = reportMode === "animal" ? incident === i.id : environmentalIncident === i.id;
             return (
-              <button key={i.id} onClick={() => setIncident(i.id as AnimalIncident["incident"])} className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left ${a ? "border-teal bg-teal/5" : "border-border bg-card"}`}>
+              <button
+                key={i.id}
+                onClick={() => {
+                  if (reportMode === "animal") setIncident(i.id as AnimalIncident["incident"]);
+                  else setEnvironmentalIncident(i.id as EnvironmentalIncident["type"]);
+                }}
+                className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left ${a ? "border-teal bg-teal/5" : "border-border bg-card"}`}
+              >
                 <Icon className="w-4 h-4 text-warning"/>
                 <span className="text-[13px] font-semibold text-navy flex-1">{i.label}</span>
                 {a && <span className="w-2 h-2 rounded-full bg-teal"/>}
               </button>
             );
           })}
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Incident date</span>
+            <input
+              type="date"
+              value={incidentDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setIncidentDate(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-border bg-card p-3 text-[13px] font-semibold text-navy focus:outline-none focus:border-teal"
+            />
+          </label>
+          {reportMode === "animal" ? (
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Animals affected</span>
+            <input
+              value={affectedAnimals}
+              onChange={(e) => setAffectedAnimals(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              onBlur={() => {
+                if (!affectedAnimals || Number(affectedAnimals) < 1) setAffectedAnimals("1");
+              }}
+              className="mt-1 w-full rounded-xl border border-border bg-card p-3 text-[13px] font-semibold text-navy focus:outline-none focus:border-teal"
+              placeholder="1"
+              inputMode="numeric"
+            />
+          </label>
+          ) : (
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Vector count</span>
+            <input
+              value={vectorCount}
+              disabled={environmentalIncident !== "vector-spotting"}
+              onChange={(e) => setVectorCount(e.target.value.replace(/\D/g, "").slice(0, 5))}
+              onBlur={() => {
+                if (!vectorCount || Number(vectorCount) < 1) setVectorCount("1");
+              }}
+              className="mt-1 w-full rounded-xl border border-border bg-card p-3 text-[13px] font-semibold text-navy focus:outline-none focus:border-teal disabled:opacity-50"
+              placeholder="1"
+              inputMode="numeric"
+            />
+          </label>
+          )}
         </div>
         <button onClick={toggleVoiceNote} className={`mt-2 w-full flex items-center gap-3 rounded-xl border px-4 py-3 ${isRecording ? "border-danger bg-danger/8" : "border-border bg-success/5"}`}>
           {isRecording ? <Square className="w-4 h-4 text-danger"/> : <Mic className="w-4 h-4 text-success"/>}
@@ -323,7 +464,7 @@ function Report() {
               <div className="mt-2 rounded-lg border border-teal/20 bg-teal/5 p-3">
                 <div className="flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-teal/25 border-t-teal" />
-                  <p className="text-[12px] font-semibold text-navy">Gemma is turning the voice note into a concise vet summary.</p>
+                  <p className="text-[12px] font-semibold text-navy">Gemma is turning the voice note into a concise report summary.</p>
                 </div>
               </div>
             ) : null}
@@ -345,7 +486,7 @@ function Report() {
             </button>
           </div>
         ) : null}
-        <textarea value={notes} onChange={(e)=>setNotes(e.target.value)} rows={3} placeholder="Add notes about behavior, location, time observed…" className="mt-2 w-full rounded-xl bg-card border border-border p-3 text-[13px] focus:outline-none focus:border-teal"/>
+        <textarea value={notes} onChange={(e)=>setNotes(e.target.value)} rows={3} placeholder={reportMode === "animal" ? "Add notes about behavior, location, time observed..." : "Explain the issue, location details, visible hazards, or affected area..."} className="mt-2 w-full rounded-xl bg-card border border-border p-3 text-[13px] focus:outline-none focus:border-teal"/>
         <input value={zip} onChange={(e)=>setZip(e.target.value.replace(/\D/g,"").slice(0,5))} className="mt-2 w-full rounded-xl bg-card border border-border p-3 text-[13px] font-semibold text-navy focus:outline-none focus:border-teal" placeholder="ZIP" inputMode="numeric"/>
         <button
           type="button"
@@ -420,6 +561,11 @@ function fileToDataUrl(file: File) {
     reader.onerror = () => reject(new Error("Could not read image"));
     reader.readAsDataURL(file);
   });
+}
+
+function dateInputToIso(value: string) {
+  if (!value) return new Date().toISOString();
+  return new Date(`${value}T12:00:00`).toISOString();
 }
 
 function ImageAnalysisLoading() {
@@ -519,6 +665,27 @@ function computeTriage(incident: AnimalIncident["incident"], species: AnimalInci
       "Contact local veterinarian via VetLink Network",
       "Preserve carcass / samples — do not move animals",
       "Submit a follow-up report in 24h",
+    ],
+  };
+}
+
+function computeEnvironmentalTriage(incident: EnvironmentalIncident["type"], vectorCount: string) {
+  const count = Math.max(1, Number.parseInt(vectorCount, 10) || 1);
+  const urgency: RiskLevel =
+    incident === "water-contamination" || (incident === "vector-spotting" && count >= 10)
+      ? "high"
+      : "moderate";
+  const label = incident.replace(/-/g, " ");
+  return {
+    urgency,
+    urgencyLabel: urgency === "high" ? "Public Health Priority" : "Watch",
+    actionLabel: urgency === "high" ? "Urgent Follow-up" : "Within 24h",
+    summary: `Environmental ${label} report may affect local exposure risk. Photo evidence, location context, and voice notes help public health teams assess scope and next steps.`,
+    next: [
+      "Avoid direct contact with contaminated water or dense vector areas",
+      "Mark the location as precisely as safely possible",
+      "Estimate affected area, vector density, or number of vectors",
+      "Submit a follow-up report if the condition spreads or worsens",
     ],
   };
 }
