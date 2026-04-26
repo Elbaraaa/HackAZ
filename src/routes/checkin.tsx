@@ -23,12 +23,14 @@ const SYMPTOMS: { id: Symptom; label: string }[] = [
   { id: "stomach", label: "Stomach Issues" },
   { id: "sore-throat", label: "Sore Throat" },
   { id: "body-aches", label: "Body Aches" },
+  { id: "other", label: "Something Else" },
 ];
 
 function CheckIn() {
   const navigate = useNavigate();
   const [feeling, setFeeling] = useState<CheckIn["feeling"]>("symptoms");
   const [symptoms, setSymptoms] = useState<Symptom[]>(["fatigue"]);
+  const [otherSymptom, setOtherSymptom] = useState("");
   const [zip, setZip] = useState("85719");
   const [setting, setSetting] = useState<CheckIn["setting"]>("workplace");
   const vitals = simulateVitals(feeling);
@@ -45,6 +47,7 @@ function CheckIn() {
       feeling,
       symptoms: feeling === "symptoms" ? symptoms : [],
       setting,
+      otherSymptom: symptoms.includes("other") ? otherSymptom.trim() : undefined,
       vitals,
       risk: r.level,
     };
@@ -112,6 +115,21 @@ function CheckIn() {
               );
             })}
           </div>
+          {symptoms.includes("other") ? (
+            <div className="mt-3 rounded-2xl bg-warning/10 border border-warning/30 p-4">
+              <label className="block text-[12px] font-bold text-warning">Describe what feels different</label>
+              <textarea
+                value={otherSymptom}
+                onChange={(e) => setOtherSymptom(e.target.value)}
+                rows={3}
+                placeholder="Example: dizziness, rash, chest tightness, unusual pain..."
+                className="mt-2 w-full rounded-xl bg-card border border-border p-3 text-[13px] focus:outline-none focus:border-teal"
+              />
+              <p className="mt-2 text-[12px] text-navy leading-relaxed">
+                If this symptom is severe, unusual for you, getting worse, or includes trouble breathing, chest pain, confusion, fainting, or signs of dehydration, seek medical attention right away.
+              </p>
+            </div>
+          ) : null}
         </section>
       )}
 

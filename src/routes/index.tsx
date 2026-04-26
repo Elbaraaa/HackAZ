@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
-import { Activity, AlertTriangle, Bug, ChevronRight, Heart, MapPin, ShieldCheck, Sparkles, Stethoscope, UserRound, Users } from "lucide-react";
+import { Activity, AlertTriangle, Bug, ChevronRight, Heart, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { activeSignals, useStore } from "@/lib/store";
 import { InteractiveRegionMap } from "@/components/InteractiveRegionMap";
 import { useMemo } from "react";
@@ -103,28 +103,6 @@ function Index() {
         <ValueCard icon={<Activity className="w-5 h-5" />} title="Report in seconds" body="Our streamlined triage flow lets you log symptoms or incidents effortlessly, feeding directly into the local intelligence grid." />
         <ValueCard icon={<Sparkles className="w-5 h-5" />} title="Get local insights back" body="Receive personalized risk assessments and actionable guidance based on verified outbreak data in your immediate vicinity." />
         <ValueCard icon={<Users className="w-5 h-5" />} title="Help detect outbreaks earlier" body="Your anonymous signals empower public health officials to deploy resources faster and contain threats before they spread." />
-      </section>
-
-      {/* User types */}
-      <section className="px-5 mt-6">
-        <p className="text-[15px] font-bold text-navy">Choose your role</p>
-        <div className="mt-3 grid grid-cols-3 gap-3">
-          <Link to="/checkin" className="rounded-2xl bg-gradient-hero p-4 text-white shadow-elevated">
-            <UserRound className="w-5 h-5" />
-            <p className="mt-2 text-sm font-bold">Patient</p>
-            <p className="text-[11px] text-white/75 mt-0.5">Check in and view insights</p>
-          </Link>
-          <Link to="/doctor" className="rounded-2xl bg-card border border-border p-4 text-navy shadow-soft">
-            <Stethoscope className="w-5 h-5 text-teal" />
-            <p className="mt-2 text-sm font-bold">Doctor</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Access clinical review</p>
-          </Link>
-          <Link to="/admin" className="rounded-2xl bg-card border border-border p-4 text-navy shadow-soft">
-            <Users className="w-5 h-5 text-teal" />
-            <p className="mt-2 text-sm font-bold">Admin</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Analytics and user roles</p>
-          </Link>
-        </div>
       </section>
 
       <p className="px-5 mt-6 text-[10px] text-center text-muted-foreground">

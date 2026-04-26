@@ -26,8 +26,13 @@ function Doctor() {
   const signals = useStore((s) => s.signals);
   const liveSignals = useMemo(() => activeSignals(signals), [signals]);
   const [reports, setReports] = useState<Record<string, string>>({});
+  const [doctorType, setDoctorType] = useState<"general" | "animal">("general");
 
-  const clusters = liveSignals.filter((s) => s.type === "symptom-cluster" || s.type === "animal" || s.type === "mosquito" || s.type === "heat");
+  const clusters = liveSignals.filter((s) =>
+    doctorType === "animal"
+      ? s.type === "animal"
+      : s.type === "symptom-cluster" || s.type === "mosquito" || s.type === "heat",
+  );
   const highRisk = clusters.filter((s) => s.severity === "high").length;
 
   const decide = (id: string, action: "monitor" | "resolved" | "dismissed", contagious: boolean) => {
@@ -48,8 +53,27 @@ function Doctor() {
       <section className="px-5 pt-2">
         <h1 className="text-3xl font-extrabold tracking-tight text-navy">Surveillance</h1>
         <p className="text-[13px] text-muted-foreground mt-1">
-          Doctor review queue for live regional cases. Auth0 is disabled, so this dashboard is open in the demo.
+          Select a clinical review lane to see the right report queue. Auth0 is disabled, so this dashboard is open in the demo.
         </p>
+      </section>
+
+      <section className="px-5 mt-4">
+        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1">
+          {[
+            { id: "general", label: "General Doctor" },
+            { id: "animal", label: "Animal / Vet" },
+          ].map((option) => (
+            <button
+              key={option.id}
+              onClick={() => setDoctorType(option.id as "general" | "animal")}
+              className={`rounded-xl py-2.5 text-[12px] font-bold transition-colors ${
+                doctorType === option.id ? "bg-card text-navy shadow-soft" : "text-muted-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="px-5 mt-5">
@@ -76,7 +100,7 @@ function Doctor() {
         <div className="rounded-2xl bg-gradient-dark-card text-white p-4 shadow-elevated">
           <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">48h Demand Forecast</p>
           <p className="mt-1 text-3xl font-extrabold">{highRisk ? "High" : "Moderate"}</p>
-          <p className="mt-1 text-[11px] opacity-80 leading-relaxed">Based on live symptom clusters and environmental signals.</p>
+          <p className="mt-1 text-[11px] opacity-80 leading-relaxed">Based on the selected {doctorType === "animal" ? "animal incident" : "human health"} review queue.</p>
         </div>
         <div className="rounded-2xl bg-card border border-border p-4 shadow-soft">
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Review Queue</p>
@@ -86,7 +110,7 @@ function Doctor() {
       </section>
 
       <section className="px-5 mt-5">
-        <p className="text-[15px] font-bold text-navy">Doctor Case Review</p>
+        <p className="text-[15px] font-bold text-navy">{doctorType === "animal" ? "Animal / Vet Case Review" : "General Doctor Case Review"}</p>
         <div className="mt-3 space-y-3">
           {clusters.length ? clusters.map((c) => (
             <div key={c.id} className="rounded-2xl bg-card border border-border p-4 shadow-soft">
@@ -130,7 +154,7 @@ function Doctor() {
           )) : (
             <div className="rounded-2xl bg-success/10 border border-success/20 p-4">
               <p className="text-[13px] font-bold text-success">No active case reports</p>
-              <p className="mt-1 text-[12px] text-navy">Resolved, dismissed, and expired reports are no longer shown on the live map.</p>
+            <p className="mt-1 text-[12px] text-navy">Resolved, dismissed, expired, or different-lane reports are not shown in this queue.</p>
             </div>
           )}
         </div>
@@ -140,8 +164,8 @@ function Doctor() {
         <p className="text-[15px] font-bold text-navy">Recommended Actions</p>
         <div className="mt-3 space-y-2">
           <div className="rounded-2xl bg-card border border-border p-4 shadow-soft">
-            <p className="text-[13px] font-bold text-navy">Prepare respiratory testing resources</p>
-            <p className="text-[12px] text-muted-foreground mt-1">Active rankings prioritize respiratory, flu-like, vector-borne, heat, and zoonotic signals.</p>
+            <p className="text-[13px] font-bold text-navy">{doctorType === "animal" ? "Coordinate veterinary follow-up" : "Prepare respiratory testing resources"}</p>
+            <p className="text-[12px] text-muted-foreground mt-1">{doctorType === "animal" ? "Animal reports are routed separately for veterinary review and zoonotic monitoring." : "General doctors see symptom, vector-borne, and heat-related human health signals."}</p>
             <button className="mt-3 rounded-lg bg-teal text-white px-3 py-2 text-[12px] font-semibold">Notify Inventory Team</button>
           </div>
           <div className="rounded-2xl bg-warning/10 border border-warning/30 p-4">

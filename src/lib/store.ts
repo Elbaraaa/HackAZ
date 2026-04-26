@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 
 export type Symptom =
   | "fever" | "cough" | "fatigue" | "headache"
-  | "sore-throat" | "body-aches" | "stomach";
+  | "sore-throat" | "body-aches" | "stomach" | "other";
 
 export type RiskLevel = "low" | "moderate" | "high";
 export type IllnessKind = "respiratory" | "flu-like" | "gastrointestinal" | "heat" | "vector-borne" | "zoonotic" | "baseline";
@@ -16,6 +16,7 @@ export type CheckIn = {
   feeling: "healthy" | "symptoms" | "unsure";
   symptoms: Symptom[];
   setting: "workplace" | "home" | "campus" | "travel";
+  otherSymptom?: string;
   vitals: {
     restingHr: number;
     hrBaselineDeltaPct: number;
@@ -114,10 +115,12 @@ function rankFor(input: {
   illness: IllnessKind;
   count?: number;
 }) {
-  const severityBase = input.severity === "high" ? 70 : input.severity === "moderate" ? 44 : 18;
-  const typeBoost = input.type === "animal" ? 12 : input.type === "symptom-cluster" ? 10 : input.type === "mosquito" ? 7 : input.type === "heat" ? 6 : 0;
-  const illnessBoost = input.illness === "zoonotic" ? 10 : input.illness === "respiratory" ? 8 : input.illness === "vector-borne" ? 6 : 0;
-  return Math.min(100, severityBase + typeBoost + illnessBoost + Math.min(input.count ?? 0, 12));
+  const count = input.count ?? 1;
+  const severityBase = input.severity === "high" ? 46 : input.severity === "moderate" ? 32 : 18;
+  const typeBoost = input.type === "animal" ? 8 : input.type === "symptom-cluster" ? 6 : input.type === "mosquito" ? 6 : input.type === "heat" ? 5 : 0;
+  const illnessBoost = input.illness === "zoonotic" ? 8 : input.illness === "respiratory" ? 5 : input.illness === "vector-borne" ? 5 : 0;
+  const clusterBoost = Math.min(Math.max(count - 1, 0) * 8, 34);
+  return Math.min(100, severityBase + typeBoost + illnessBoost + clusterBoost);
 }
 
 function signal(input: Omit<CommunitySignal, "rank" | "createdAt" | "expiresAt" | "status" | "longitude" | "latitude"> & Partial<Pick<CommunitySignal, "createdAt" | "expiresAt" | "status" | "longitude" | "latitude">>): CommunitySignal {
@@ -170,8 +173,16 @@ export function activeSignals(signals: CommunitySignal[]) {
 function illnessFromSymptoms(symptoms: Symptom[]): IllnessKind {
   if (symptoms.includes("cough") || symptoms.includes("sore-throat")) return "respiratory";
   if (symptoms.includes("stomach")) return "gastrointestinal";
+  if (symptoms.includes("other")) return "flu-like";
   if (symptoms.includes("fever") || symptoms.includes("body-aches") || symptoms.includes("fatigue")) return "flu-like";
   return "respiratory";
+}
+
+function initialSignalSeverity(risk: RiskLevel, count = 1): RiskLevel {
+  if (count <= 1 && risk === "high") return "moderate";
+  if (count >= 5 || risk === "high") return "high";
+  if (count >= 2 || risk === "moderate") return "moderate";
+  return "low";
 }
 
 export const store = {
@@ -227,19 +238,22 @@ export const store = {
     if (c.feeling === "symptoms" && c.symptoms.length) {
       const loc = locationFor(c.zip);
       const illness = illnessFromSymptoms(c.symptoms);
+      const symptomText = c.symptoms.map((symptom) =>
+        symptom === "other" && c.otherSymptom ? `other: ${c.otherSymptom}` : symptom,
+      );
       const newSig = signal({
         id: `c-${Date.now()}`,
         zip: c.zip,
         type: "symptom-cluster",
         illness,
         title: `New ${illness.replace("-", " ")} report near ${c.zip}`,
-        detail: `${c.symptoms.length} symptom(s): ${c.symptoms.join(", ")}.`,
+        detail: `${c.symptoms.length} symptom(s): ${symptomText.join(", ")}.`,
         ago: "just now",
-        severity: c.risk,
-        x: loc.x + (Math.random() - 0.5) * 8,
-        y: loc.y + (Math.random() - 0.5) * 8,
-        longitude: loc.longitude + (Math.random() - 0.5) * 0.025,
-        latitude: loc.latitude + (Math.random() - 0.5) * 0.025,
+        severity: initialSignalSeverity(c.risk, 1),
+        x: loc.x + (Math.random() - 0.5) * 18,
+        y: loc.y + (Math.random() - 0.5) * 18,
+        longitude: loc.longitude + (Math.random() - 0.5) * 0.08,
+        latitude: loc.latitude + (Math.random() - 0.5) * 0.08,
         count: 1,
       });
       state = { ...state, signals: [newSig, ...state.signals] };
@@ -265,11 +279,11 @@ export const store = {
       title: `Animal incident reported (${i.species})`,
       detail: i.notes || "Awaiting veterinary review via VetLink Network.",
       ago: "just now",
-      severity: i.urgency,
-      x: loc.x + (Math.random() - 0.5) * 10,
-      y: loc.y + (Math.random() - 0.5) * 10,
-      longitude: loc.longitude + (Math.random() - 0.5) * 0.03,
-      latitude: loc.latitude + (Math.random() - 0.5) * 0.03,
+      severity: initialSignalSeverity(i.urgency, 1),
+      x: loc.x + (Math.random() - 0.5) * 18,
+      y: loc.y + (Math.random() - 0.5) * 18,
+      longitude: loc.longitude + (Math.random() - 0.5) * 0.08,
+      latitude: loc.latitude + (Math.random() - 0.5) * 0.08,
       count: 1,
     });
     state = {

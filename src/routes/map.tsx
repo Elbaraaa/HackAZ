@@ -28,10 +28,10 @@ const TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefined;
 function MapView() {
   const signals = useStore((s) => s.signals);
   const liveSignals = useMemo(() => activeSignals(signals), [signals]);
-  const [filter, setFilter] = useState<typeof FILTERS[number]["id"]>("all");
+  const [filters, setFilters] = useState<Array<Exclude<typeof FILTERS[number]["id"], "all">>>([]);
   const filtered = useMemo(
-    () => filter === "all" ? liveSignals : liveSignals.filter((s) => s.type === filter),
-    [filter, liveSignals],
+    () => filters.length === 0 ? liveSignals : liveSignals.filter((s) => filters.includes(s.type as Exclude<typeof FILTERS[number]["id"], "all">)),
+    [filters, liveSignals],
   );
   const illnesses = useMemo(() => {
     const scores = new Map<string, { illness: string; rank: number; count: number }>();
@@ -53,7 +53,7 @@ function MapView() {
 
       <section className="relative h-[calc(100vh-8.25rem)] min-h-[620px] overflow-hidden bg-navy">
         {TOKEN ? (
-          <InteractiveRegionMap signals={filtered} token={TOKEN} className="h-full rounded-none" />
+          <InteractiveRegionMap signals={filtered} token={TOKEN} className="h-full rounded-none" showBadge={false} />
         ) : (
           <div className="h-full bg-gradient-dark-card p-5">
             <FallbackRegionMap signals={filtered} />
@@ -65,9 +65,19 @@ function MapView() {
             {FILTERS.map((f) => (
               <button
                 key={f.id}
-                onClick={() => setFilter(f.id)}
+                onClick={() => {
+                  if (f.id === "all") {
+                    setFilters([]);
+                    return;
+                  }
+                  setFilters((current) =>
+                    current.includes(f.id)
+                      ? current.filter((item) => item !== f.id)
+                      : [...current, f.id],
+                  );
+                }}
                 className={`shrink-0 rounded-full px-3.5 py-2 text-[12px] font-semibold border shadow-soft backdrop-blur-md ${
-                  filter === f.id ? "bg-teal text-white border-teal" : "bg-white/90 text-navy border-white/70"
+                  (f.id === "all" ? filters.length === 0 : filters.includes(f.id)) ? "bg-teal text-white border-teal" : "bg-white/90 text-navy border-white/70"
                 }`}
               >
                 {f.label}
@@ -83,8 +93,8 @@ function MapView() {
           ) : null}
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/45 via-black/10 to-transparent p-4 pb-5">
-          <div className="pointer-events-auto rounded-2xl bg-card/95 border border-white/50 p-4 shadow-elevated backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/35 via-black/5 to-transparent p-4 pb-5">
+          <div className="pointer-events-auto rounded-2xl bg-card/92 border border-white/50 p-3 shadow-elevated backdrop-blur-xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[15px] font-extrabold text-navy">Live Regional Intelligence</p>
@@ -93,15 +103,15 @@ function MapView() {
               <span className="shrink-0 rounded-full bg-danger/10 px-2.5 py-1 text-[11px] font-bold text-danger">{filtered.length} live</span>
             </div>
 
-            <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
+            <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
               <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[oklch(0.62_0.22_25)]"/>High</div>
               <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[oklch(0.78_0.16_75)]"/>Moderate</div>
               <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[oklch(0.62_0.13_155)]"/>Low</div>
             </div>
 
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-              {illnesses.slice(0, 4).map((item, index) => (
-                <div key={item.illness} className="min-w-[132px] rounded-xl bg-surface border border-border p-3">
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {illnesses.slice(0, 3).map((item, index) => (
+                <div key={item.illness} className="min-w-[122px] rounded-xl bg-surface border border-border p-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="w-6 h-6 rounded-lg bg-navy text-white grid place-items-center text-[10px] font-extrabold">{index + 1}</span>
                     <span className="text-[10px] font-bold text-danger">Rank {item.rank}</span>
@@ -112,11 +122,11 @@ function MapView() {
               ))}
             </div>
 
-            <div className="mt-2 max-h-28 space-y-2 overflow-y-auto pr-1">
-              {filtered.slice(0, 3).map((signal) => (
+            <div className="mt-2 max-h-20 space-y-2 overflow-y-auto pr-1">
+              {filtered.slice(0, 2).map((signal) => (
                 <CompactSignalRow key={signal.id} signal={signal} />
               ))}
-              {filtered.length > 3 ? (
+              {filtered.length > 2 ? (
                 <p className="text-center text-[10px] font-semibold text-muted-foreground">Scroll map or change filter to inspect more live regions</p>
               ) : null}
             </div>

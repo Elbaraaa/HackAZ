@@ -8,11 +8,13 @@ export function InteractiveRegionMap({
   token,
   className = "h-72",
   compact = false,
+  showBadge = true,
 }: {
   signals: CommunitySignal[];
   token: string;
   className?: string;
   compact?: boolean;
+  showBadge?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -30,7 +32,7 @@ export function InteractiveRegionMap({
       mapbox.default.accessToken = token;
       mapRef.current = new mapbox.default.Map({
         container: containerRef.current,
-        style: "mapbox://styles/mapbox/light-v11",
+        style: "mapbox://styles/mapbox/streets-v12",
         center: [-110.95, 32.18],
         zoom: compact ? 8.55 : 9,
         attributionControl: !compact,
@@ -40,6 +42,8 @@ export function InteractiveRegionMap({
       }
       mapRef.current.on("load", () => {
         addRegionLayers(mapRef.current!);
+        mapRef.current!.resize();
+        window.setTimeout(() => mapRef.current?.resize(), 120);
         setMapReady(true);
       });
       mapRef.current.on("zoomend", () => {
@@ -100,10 +104,12 @@ export function InteractiveRegionMap({
   return (
     <div className={`relative w-full overflow-hidden rounded-2xl bg-navy ${className}`}>
       <div ref={containerRef} className="h-full w-full" />
-      <div className="absolute left-3 top-3 rounded-xl bg-white/90 px-3 py-2 shadow-soft">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Interactive Mapbox</p>
-        <p className="text-[12px] font-extrabold text-navy">Zoom in for 3D regions</p>
-      </div>
+      {showBadge ? (
+        <div className="absolute left-3 top-3 rounded-xl bg-white/90 px-3 py-2 shadow-soft">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Interactive Mapbox</p>
+          <p className="text-[12px] font-extrabold text-navy">Zoom in for 3D regions</p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -149,28 +155,24 @@ function updateRegionData(map: mapboxgl.Map, signals: CommunitySignal[]) {
   if (!source) return;
   source.setData({
     type: "FeatureCollection",
-    features: signals
-      .filter((signal) => signal.type !== "clinic" && signal.type !== "healthy-report")
-      .map((signal) => {
-        const radiusMiles = radiusMilesFor(signal);
-        return {
-          type: "Feature",
-          properties: {
-            id: signal.id,
-            title: signal.title,
-            illness: signal.illness.replace("-", " "),
-            severity: signal.severity,
-            rank: signal.rank,
-            color: `#${markerColor(signal)}`,
-            radiusMiles,
-            height: Math.max(260, signal.rank * 34),
-          },
-          geometry: {
-            type: "Polygon",
-            coordinates: [circleCoordinates(signal.longitude, signal.latitude, radiusMiles)],
-          },
-        };
-      }),
+    features: clusterSignals(signals)
+      .map((cluster) => ({
+        type: "Feature",
+        properties: {
+          id: cluster.ids.join(","),
+          title: cluster.count === 1 ? cluster.title : `${cluster.count} related reports`,
+          illness: cluster.illness.replace("-", " "),
+          severity: cluster.severity,
+          rank: cluster.rank,
+          color: `#${cluster.color}`,
+          radiusMiles: cluster.radiusMiles,
+          height: Math.max(180, cluster.rank * 28),
+        },
+        geometry: {
+          type: "Polygon",
+          coordinates: [circleCoordinates(cluster.longitude, cluster.latitude, cluster.radiusMiles)],
+        },
+      })),
   });
 }
 
@@ -178,11 +180,93 @@ function emptyFeatureCollection() {
   return { type: "FeatureCollection", features: [] };
 }
 
-function radiusMilesFor(signal: CommunitySignal) {
-  const base = signal.severity === "high" ? 5 : signal.severity === "moderate" ? 3 : 1.5;
-  const countBoost = Math.min(signal.count ?? 1, 10) * 0.18;
-  const typeBoost = signal.type === "animal" || signal.type === "mosquito" ? 1.2 : 0;
-  return Number((base + countBoost + typeBoost).toFixed(1));
+type SignalCluster = {
+  ids: string[];
+  title: string;
+  type: CommunitySignal["type"];
+  illness: CommunitySignal["illness"];
+  severity: CommunitySignal["severity"];
+  longitude: number;
+  latitude: number;
+  rank: number;
+  count: number;
+  radiusMiles: number;
+  color: string;
+};
+
+function clusterSignals(signals: CommunitySignal[]): SignalCluster[] {
+  const clusters: SignalCluster[] = [];
+  const regionSignals = signals.filter((signal) => signal.type !== "clinic" && signal.type !== "healthy-report");
+
+  for (const signal of regionSignals) {
+    const closest = clusters
+      .filter((cluster) => cluster.type === signal.type || cluster.illness === signal.illness)
+      .map((cluster) => ({ cluster, distance: distanceMiles(cluster.longitude, cluster.latitude, signal.longitude, signal.latitude) }))
+      .filter(({ distance }) => distance <= mergeDistanceMiles(signal))
+      .sort((a, b) => a.distance - b.distance)[0]?.cluster;
+
+    if (!closest) {
+      clusters.push({
+        ids: [signal.id],
+        title: signal.title,
+        type: signal.type,
+        illness: signal.illness,
+        severity: signal.severity,
+        longitude: signal.longitude,
+        latitude: signal.latitude,
+        rank: signal.rank,
+        count: signal.count ?? 1,
+        radiusMiles: 0,
+        color: markerColor(signal),
+      });
+      continue;
+    }
+
+    const reportCount = signal.count ?? 1;
+    const totalCount = closest.count + reportCount;
+    closest.longitude = ((closest.longitude * closest.count) + (signal.longitude * reportCount)) / totalCount;
+    closest.latitude = ((closest.latitude * closest.count) + (signal.latitude * reportCount)) / totalCount;
+    closest.count = totalCount;
+    closest.ids.push(signal.id);
+    closest.rank = Math.max(closest.rank, signal.rank + Math.min(totalCount * 5, 24));
+    closest.severity = severityFromRank(closest.rank);
+    closest.color = colorFromRank(closest.rank);
+  }
+
+  return clusters.map((cluster) => ({
+    ...cluster,
+    radiusMiles: radiusMilesForCluster(cluster),
+    color: colorFromRank(cluster.rank),
+  }));
+}
+
+function mergeDistanceMiles(signal: CommunitySignal) {
+  if (signal.type === "animal") return 2.2;
+  if (signal.type === "mosquito" || signal.type === "heat") return 3.2;
+  return 1.8;
+}
+
+function radiusMilesForCluster(cluster: SignalCluster) {
+  const singleBase = cluster.type === "animal" || cluster.type === "mosquito" ? 0.95 : 0.65;
+  const spreadBoost = Math.sqrt(Math.max(cluster.count - 1, 0)) * 0.55;
+  const riskBoost = cluster.rank >= 78 ? 0.95 : cluster.rank >= 55 ? 0.45 : 0;
+  return Number(Math.min(6.5, singleBase + spreadBoost + riskBoost).toFixed(1));
+}
+
+function severityFromRank(rank: number): CommunitySignal["severity"] {
+  if (rank >= 78) return "high";
+  if (rank >= 35) return "moderate";
+  return "low";
+}
+
+function distanceMiles(lngA: number, latA: number, lngB: number, latB: number) {
+  const earthRadiusMiles = 3958.8;
+  const dLat = toRadians(latB - latA);
+  const dLng = toRadians(lngB - lngA);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(latA)) * Math.cos(toRadians(latB)) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthRadiusMiles * Math.asin(Math.sqrt(a));
 }
 
 function circleCoordinates(longitude: number, latitude: number, radiusMiles: number) {
@@ -208,6 +292,19 @@ function circleCoordinates(longitude: number, latitude: number, radiusMiles: num
 }
 
 function markerColor(signal: CommunitySignal) {
+  if (signal.type === "clinic") return "2f91a3";
+  if (signal.type === "healthy-report") return "31a46c";
+  return colorFromRank(signal.rank);
+}
+
+function colorFromRank(rank: number) {
+  if (rank >= 78) return "d84a3a";
+  if (rank >= 55) return "e57f22";
+  if (rank >= 32) return "d99a00";
+  return "31a46c";
+}
+
+function oldMarkerColor(signal: CommunitySignal) {
   if (signal.type === "clinic") return "2f91a3";
   if (signal.type === "healthy-report") return "31a46c";
   if (signal.type === "mosquito") return "2aa79b";
