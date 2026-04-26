@@ -18,6 +18,7 @@ import { Route as MapRouteImport } from './routes/map'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as DoctorRouteImport } from './routes/doctor'
 import { Route as CheckinRouteImport } from './routes/checkin'
+import { Route as AlexaRouteImport } from './routes/alexa'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiProfileRouteImport } from './routes/api/profile'
@@ -78,6 +79,11 @@ const DoctorRoute = DoctorRouteImport.update({
 const CheckinRoute = CheckinRouteImport.update({
   id: '/checkin',
   path: '/checkin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlexaRoute = AlexaRouteImport.update({
+  id: '/alexa',
+  path: '/alexa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -164,6 +170,7 @@ const ApiAdminApproveAccountRoute = ApiAdminApproveAccountRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/alexa': typeof AlexaRoute
   '/checkin': typeof CheckinRoute
   '/doctor': typeof DoctorRoute
   '/insights': typeof InsightsRoute
@@ -191,6 +198,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/alexa': typeof AlexaRoute
   '/checkin': typeof CheckinRoute
   '/doctor': typeof DoctorRoute
   '/insights': typeof InsightsRoute
@@ -219,6 +227,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/alexa': typeof AlexaRoute
   '/checkin': typeof CheckinRoute
   '/doctor': typeof DoctorRoute
   '/insights': typeof InsightsRoute
@@ -248,6 +257,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/alexa'
     | '/checkin'
     | '/doctor'
     | '/insights'
@@ -275,6 +285,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/alexa'
     | '/checkin'
     | '/doctor'
     | '/insights'
@@ -302,6 +313,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/alexa'
     | '/checkin'
     | '/doctor'
     | '/insights'
@@ -330,6 +342,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AlexaRoute: typeof AlexaRoute
   CheckinRoute: typeof CheckinRoute
   DoctorRoute: typeof DoctorRoute
   InsightsRoute: typeof InsightsRoute
@@ -418,6 +431,13 @@ declare module '@tanstack/react-router' {
       path: '/checkin'
       fullPath: '/checkin'
       preLoaderRoute: typeof CheckinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/alexa': {
+      id: '/alexa'
+      path: '/alexa'
+      fullPath: '/alexa'
+      preLoaderRoute: typeof AlexaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -538,6 +558,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AlexaRoute: AlexaRoute,
   CheckinRoute: CheckinRoute,
   DoctorRoute: DoctorRoute,
   InsightsRoute: InsightsRoute,

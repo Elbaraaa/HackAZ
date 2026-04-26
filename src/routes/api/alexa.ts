@@ -44,7 +44,7 @@ export const Route = createFileRoute("/api/alexa")({
   },
 });
 
-async function handleAlexaRequest(body: any) {
+export async function handleAlexaRequest(body: any) {
   const requestType = body?.request?.type;
   const sessionAttributes = readSessionAttributes(body);
   const intentName = getIntentName(body);
@@ -267,22 +267,31 @@ export function buildAlexaResponse(
   sessionAttributes: Record<string, unknown> = {},
   repromptText = text,
 ) {
+  const response: {
+    outputSpeech: { type: "PlainText"; text: string };
+    reprompt?: { outputSpeech: { type: "PlainText"; text: string } };
+    shouldEndSession: boolean;
+  } = {
+    outputSpeech: {
+      type: "PlainText",
+      text,
+    },
+    shouldEndSession,
+  };
+
+  if (!shouldEndSession) {
+    response.reprompt = {
+      outputSpeech: {
+        type: "PlainText",
+        text: repromptText,
+      },
+    };
+  }
+
   return {
     version: "1.0",
     sessionAttributes,
-    response: {
-      outputSpeech: {
-        type: "PlainText",
-        text,
-      },
-      reprompt: {
-        outputSpeech: {
-          type: "PlainText",
-          text: repromptText,
-        },
-      },
-      shouldEndSession,
-    },
+    response,
   };
 }
 
