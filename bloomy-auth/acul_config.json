@@ -1,0 +1,10 @@
+{
+  "chosen_template": "react",
+  "screens": [
+    "login-id"
+  ],
+  "created_at": "2026-04-26T10:52:22Z",
+  "modified_at": "2026-04-26T10:52:22Z",
+  "app_version": "v2.0.1",
+  "acul_manifest_version": "1.0.0"
+}
