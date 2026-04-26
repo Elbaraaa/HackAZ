@@ -15,6 +15,7 @@ export type CaseStatus = "active" | "doctor-review" | "resolved" | "dismissed" |
 
 export type CheckIn = {
   id: string;
+  reporterUserId?: string;
   date: string;
   zip: string;
   feeling: "healthy" | "symptoms" | "unsure";
@@ -39,6 +40,7 @@ export type CheckIn = {
 
 export type AnimalIncident = {
   id: string;
+  reporterUserId?: string;
   date: string;
   zip: string;
   species: "cattle" | "poultry" | "horse" | "sheep-goat" | "wildlife" | "other";
@@ -60,6 +62,7 @@ export type AnimalIncident = {
 
 export type EnvironmentalIncident = {
   id: string;
+  reporterUserId?: string;
   date: string;
   zip: string;
   type: "water-flooding" | "water-contamination" | "vector-spotting" | "other";
@@ -83,6 +86,9 @@ export type DoctorReport = {
 
 export type CommunitySignal = {
   id: string;
+  reporterUserId?: string;
+  reviewLane?: "clinical" | "veterinary" | "environmental";
+  reviewerWorkspaceId?: string;
   zip: string;
   type: "symptom-cluster" | "healthy-report" | "animal" | "environmental" | "mosquito" | "heat" | "clinic";
   illness: IllnessKind;
@@ -132,6 +138,9 @@ const ZIP_LOCATIONS: Record<string, { longitude: number; latitude: number; x: nu
   "85641": { longitude: -110.7709, latitude: 32.0479, x: 70, y: 70 },
   "85629": { longitude: -110.9298, latitude: 31.9557, x: 50, y: 80 },
 };
+
+const DEFAULT_REVIEW_WORKSPACE_ID = "doctor-doctor-demo";
+const DEFAULT_ENVIRONMENTAL_REVIEW_WORKSPACE_ID = "environmental-environmental-demo";
 
 function locationFor(zip: string, seed = zip) {
   const known = ZIP_LOCATIONS[zip];
@@ -227,11 +236,11 @@ function signal(input: Omit<CommunitySignal, "rank" | "createdAt" | "expiresAt" 
 }
 
 const SEED_SIGNALS: CommunitySignal[] = [
-  signal({ id: "s1", zip: "85719", type: "symptom-cluster", illness: "flu-like", title: "Unusual fatigue cluster near 85719", detail: "14 reports matching fatigue + low-grade fever in the past 48h.", ago: "2h", severity: "high", x: 38, y: 42, count: 14, createdAt: new Date(now - hours(2)).toISOString() }),
-  signal({ id: "s2", zip: "85705", type: "mosquito", illness: "vector-borne", title: "Mosquito risk elevated due to rainfall", detail: "Recent heavy rainfall combined with rising temperatures has boosted breeding.", ago: "4h", severity: "moderate", x: 62, y: 30, createdAt: new Date(now - hours(4)).toISOString() }),
-  signal({ id: "s3", zip: "85721", type: "symptom-cluster", illness: "respiratory", title: "Respiratory symptoms up 22% near 85721", detail: "Abnormal resting HR and elevated respiratory rate detected within a 5-mile radius.", ago: "6h", severity: "moderate", x: 24, y: 60, count: 9, createdAt: new Date(now - hours(6)).toISOString() }),
-  signal({ id: "s4", zip: "85641", type: "heat", illness: "heat", title: "Heat-related symptoms rising near campus", detail: "Hydration warnings active for the next 48h.", ago: "1d", severity: "moderate", x: 70, y: 70, createdAt: new Date(now - hours(24)).toISOString() }),
-  signal({ id: "s5", zip: "85629", type: "animal", illness: "zoonotic", title: "2 animal incidents reported", detail: "Cattle showing sudden sickness - possible zoonotic signal under review.", ago: "1d", severity: "high", x: 50, y: 80, count: 2, createdAt: new Date(now - hours(24)).toISOString() }),
+  signal({ id: "s1", reviewLane: "clinical", reviewerWorkspaceId: DEFAULT_REVIEW_WORKSPACE_ID, zip: "85719", type: "symptom-cluster", illness: "flu-like", title: "Unusual fatigue cluster near 85719", detail: "14 reports matching fatigue + low-grade fever in the past 48h.", ago: "2h", severity: "high", x: 38, y: 42, count: 14, createdAt: new Date(now - hours(2)).toISOString() }),
+  signal({ id: "s2", reviewLane: "environmental", reviewerWorkspaceId: DEFAULT_ENVIRONMENTAL_REVIEW_WORKSPACE_ID, zip: "85705", type: "mosquito", illness: "vector-borne", title: "Mosquito risk elevated due to rainfall", detail: "Recent heavy rainfall combined with rising temperatures has boosted breeding.", ago: "4h", severity: "moderate", x: 62, y: 30, createdAt: new Date(now - hours(4)).toISOString() }),
+  signal({ id: "s3", reviewLane: "clinical", reviewerWorkspaceId: DEFAULT_REVIEW_WORKSPACE_ID, zip: "85721", type: "symptom-cluster", illness: "respiratory", title: "Respiratory symptoms up 22% near 85721", detail: "Abnormal resting HR and elevated respiratory rate detected within a 5-mile radius.", ago: "6h", severity: "moderate", x: 24, y: 60, count: 9, createdAt: new Date(now - hours(6)).toISOString() }),
+  signal({ id: "s4", reviewLane: "environmental", reviewerWorkspaceId: DEFAULT_ENVIRONMENTAL_REVIEW_WORKSPACE_ID, zip: "85641", type: "heat", illness: "heat", title: "Heat-related symptoms rising near campus", detail: "Hydration warnings active for the next 48h.", ago: "1d", severity: "moderate", x: 70, y: 70, createdAt: new Date(now - hours(24)).toISOString() }),
+  signal({ id: "s5", reviewLane: "veterinary", reviewerWorkspaceId: DEFAULT_REVIEW_WORKSPACE_ID, zip: "85629", type: "animal", illness: "zoonotic", title: "2 animal incidents reported", detail: "Cattle showing sudden sickness - possible zoonotic signal under review.", ago: "1d", severity: "high", x: 50, y: 80, count: 2, createdAt: new Date(now - hours(24)).toISOString() }),
   signal({ id: "s6", zip: "85719", type: "clinic", illness: "baseline", title: "ValleyMed Clinic - walk-in available", detail: "Open until 9pm. CarePoint Telehealth covers after-hours.", ago: "-", severity: "low", x: 44, y: 50 }),
   signal({ id: "s7", zip: "85705", type: "healthy-report", illness: "baseline", title: "412 healthy check-ins this week", detail: "Strong baseline data helping detect anomalies earlier.", ago: "live", severity: "low", x: 56, y: 22 }),
 ];
@@ -317,10 +326,10 @@ export const store = {
     };
     emit();
   },
-  addCheckIn: (c: CheckIn) => {
+  addCheckIn: (c: CheckIn, context?: { reporterUserId?: string; reviewerWorkspaceId?: string }) => {
     state = {
       ...state,
-      checkIns: [c, ...state.checkIns],
+      checkIns: [{ ...c, reporterUserId: context?.reporterUserId ?? c.reporterUserId }, ...state.checkIns],
       streak: state.streak + 1,
       points: state.points + (c.feeling === "healthy" ? 25 : 15),
     };
@@ -342,6 +351,9 @@ export const store = {
       ].filter(Boolean);
       const newSig = signal({
         id,
+        reporterUserId: context?.reporterUserId ?? c.reporterUserId,
+        reviewLane: "clinical",
+        reviewerWorkspaceId: context?.reviewerWorkspaceId ?? DEFAULT_REVIEW_WORKSPACE_ID,
         zip: c.zip,
         type: "symptom-cluster",
         illness,
@@ -371,7 +383,7 @@ export const store = {
     }
     emit();
   },
-  addIncident: (i: AnimalIncident) => {
+  addIncident: (i: AnimalIncident, context?: { reporterUserId?: string; reviewerWorkspaceId?: string }) => {
     const id = `i-${Date.now()}`;
     const loc = locationFor(i.zip, id);
     const affectedAnimals = Math.max(1, Math.round(i.affectedAnimals || 1));
@@ -380,6 +392,9 @@ export const store = {
       : undefined;
     const sig = signal({
       id,
+      reporterUserId: context?.reporterUserId ?? i.reporterUserId,
+      reviewLane: "veterinary",
+      reviewerWorkspaceId: context?.reviewerWorkspaceId ?? DEFAULT_ENVIRONMENTAL_REVIEW_WORKSPACE_ID,
       zip: i.zip,
       type: "animal",
       illness: "zoonotic",
@@ -403,13 +418,13 @@ export const store = {
     });
     state = {
       ...state,
-      incidents: [i, ...state.incidents],
+      incidents: [{ ...i, reporterUserId: context?.reporterUserId ?? i.reporterUserId }, ...state.incidents],
       signals: [sig, ...state.signals],
       points: state.points + 30,
     };
     emit();
   },
-  addEnvironmentalIncident: (i: EnvironmentalIncident) => {
+  addEnvironmentalIncident: (i: EnvironmentalIncident, context?: { reporterUserId?: string; reviewerWorkspaceId?: string }) => {
     const id = `e-${Date.now()}`;
     const loc = locationFor(i.zip, id);
     const devicePoint = i.approxLocation
@@ -420,6 +435,9 @@ export const store = {
     const isVector = i.type === "vector-spotting";
     const sig = signal({
       id,
+      reporterUserId: context?.reporterUserId ?? i.reporterUserId,
+      reviewLane: "environmental",
+      reviewerWorkspaceId: context?.reviewerWorkspaceId ?? DEFAULT_REVIEW_WORKSPACE_ID,
       zip: i.zip,
       type: "environmental",
       illness: isVector ? "vector-borne" : i.type === "water-contamination" ? "gastrointestinal" : "baseline",
@@ -443,7 +461,7 @@ export const store = {
     });
     state = {
       ...state,
-      environmentalIncidents: [i, ...state.environmentalIncidents],
+      environmentalIncidents: [{ ...i, reporterUserId: context?.reporterUserId ?? i.reporterUserId }, ...state.environmentalIncidents],
       signals: [sig, ...state.signals],
       points: state.points + 20,
     };

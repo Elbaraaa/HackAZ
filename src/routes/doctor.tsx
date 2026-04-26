@@ -4,9 +4,11 @@ import { activeSignals, store, useStore } from "@/lib/store";
 import { formatRelativeTime } from "@/lib/utils";
 import { rewardAudience } from "@/lib/rewards";
 import { Activity, Bell, Check, ChevronRight, X, AlertTriangle, TrendingUp, ClipboardCheck, ShieldAlert, CalendarDays, Image as ImageIcon, Gift } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
+import { useAppUser } from "@/hooks/use-app-user";
+import { getDoctorProfile } from "@/lib/app-data";
 
 export const Route = createFileRoute("/doctor")({
   head: () => ({
@@ -33,13 +35,24 @@ const REVIEW_LANES: { id: ReviewLane; label: string; role: string }[] = [
 ];
 
 function ReviewHub() {
+  const { role, profile } = useAppUser();
   const signals = useStore((s) => s.signals);
   const liveSignals = useMemo(() => activeSignals(signals), [signals]);
   const [reports, setReports] = useState<Record<string, string>>({});
   const [reviewLane, setReviewLane] = useState<ReviewLane>("clinical");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const doctorProfile = role === "doctor" || role === "environmental" ? getDoctorProfile(profile?.doctorProfileId) : null;
+  const scopedSignals = useMemo(() => {
+    if (role === "admin") return liveSignals;
+    if (!profile) return [];
+    return liveSignals.filter((signal) => signal.reviewerWorkspaceId === profile.workspaceId);
+  }, [liveSignals, profile, role]);
 
-  const clusters = liveSignals.filter((s) =>
+  useEffect(() => {
+    if (doctorProfile?.reviewLane) setReviewLane(doctorProfile.reviewLane);
+  }, [doctorProfile?.reviewLane]);
+
+  const clusters = scopedSignals.filter((s) =>
     reviewLane === "veterinary"
       ? s.type === "animal"
       : reviewLane === "environmental"
@@ -49,13 +62,36 @@ function ReviewHub() {
   const highRisk = clusters.filter((s) => s.severity === "high").length;
   const activeLane = REVIEW_LANES.find((lane) => lane.id === reviewLane)!;
   const reviewerReward = rewardAudience("reviewer");
+  const canSwitchLanes = role === "admin";
   const notifications = clusters
     .filter((signal) => signal.severity === "high" || signal.evidencePhoto || signal.voiceSummary)
     .slice(0, 4);
 
+  if (role !== "doctor" && role !== "environmental" && role !== "admin") {
+    return (
+      <AppShell>
+        <TopBar title="Bloomy" back="/" pill={<StatusPill tone="warn">Restricted</StatusPill>} />
+        <section className="px-5 pt-8">
+          <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4">
+            <ShieldAlert className="h-8 w-8 text-warning" />
+            <h1 className="mt-4 text-2xl font-extrabold text-navy">Doctor workspace required</h1>
+            <p className="mt-2 text-sm leading-relaxed text-navy">
+              Patient workspaces are separated from review queues. Log out and choose a reviewer portal to review cases.
+            </p>
+          </div>
+        </section>
+      </AppShell>
+    );
+  }
+
   const decide = (id: string, action: "monitor" | "resolved" | "dismissed", contagious: boolean) => {
     const summary = reports[id]?.trim() || defaultReport(action);
-    store.doctorReviewSignal(id, { action, contagious, summary, reviewer: activeLane.role });
+    store.doctorReviewSignal(id, {
+      action,
+      contagious,
+      summary,
+      reviewer: doctorProfile?.displayName ?? activeLane.role,
+    });
     toast.success(action === "monitor" ? "Case note saved" : "Case removed from live map");
   };
 
@@ -104,24 +140,36 @@ function ReviewHub() {
       <section className="px-5 pt-2">
         <h1 className="text-3xl font-extrabold tracking-tight text-navy">Review Hub</h1>
         <p className="text-[13px] text-muted-foreground mt-1">
-          Select a review lane to see the right queue for clinical, veterinary, or environmental health follow-up.
+          {role === "admin"
+            ? "Admin view can inspect all review queues."
+            : `Signed in as ${doctorProfile?.displayName ?? "reviewer"}. This hub only shows cases assigned to your workspace.`}
         </p>
       </section>
 
       <section className="px-5 mt-4">
-        <div className="grid grid-cols-3 gap-2 rounded-2xl bg-muted p-1">
-          {REVIEW_LANES.map((option) => (
-            <button
-              key={option.id}
-              onClick={() => setReviewLane(option.id)}
-              className={`rounded-xl py-2.5 text-[12px] font-bold transition-colors ${
-                reviewLane === option.id ? "bg-card text-navy shadow-soft" : "text-muted-foreground"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        {canSwitchLanes ? (
+          <div className="grid grid-cols-3 gap-2 rounded-2xl bg-muted p-1">
+            {REVIEW_LANES.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => setReviewLane(option.id)}
+                className={`rounded-xl py-2.5 text-[12px] font-bold transition-colors ${
+                  reviewLane === option.id ? "bg-card text-navy shadow-soft" : "text-muted-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-teal/20 bg-teal/5 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-teal">Assigned review lane</p>
+            <p className="mt-1 text-[15px] font-extrabold text-navy">{activeLane.role}</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              This reviewer account is locked to its own lane and assigned workspace.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="px-5 mt-4">
@@ -272,10 +320,12 @@ function ReviewHub() {
             <p className="text-[12px] text-navy mt-1">High-risk cases stay live for 96h, moderate for 72h, and low for 36h unless a reviewer resolves or dismisses them sooner.</p>
           </div>
         </div>
-        <Link to="/public-health" className="mt-4 w-full inline-flex items-center justify-between rounded-2xl bg-card border border-border p-4">
-          <span className="text-[13px] font-bold text-navy">View public health dashboard</span>
-          <ChevronRight className="w-4 h-4"/>
-        </Link>
+        {role === "admin" ? (
+          <Link to="/public-health" className="mt-4 w-full inline-flex items-center justify-between rounded-2xl bg-card border border-border p-4">
+            <span className="text-[13px] font-bold text-navy">View public health dashboard</span>
+            <ChevronRight className="w-4 h-4"/>
+          </Link>
+        ) : null}
       </section>
     </AppShell>
   );

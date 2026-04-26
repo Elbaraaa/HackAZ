@@ -1,6 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Activity, Gift, Map as MapIcon, Stethoscope, Home } from "lucide-react";
+import { Activity, Gift, Map as MapIcon, Stethoscope, Home, Shield } from "lucide-react";
 import { type ReactNode, useId } from "react";
+import { useAppUser } from "@/hooks/use-app-user";
 
 const tabs = [
   { to: "/", label: "Home", icon: Home },
@@ -8,18 +9,25 @@ const tabs = [
   { to: "/map", label: "Map", icon: MapIcon },
   { to: "/rewards", label: "Rewards", icon: Gift },
   { to: "/doctor", label: "Review", icon: Stethoscope },
+  { to: "/admin", label: "Admin", icon: Shield },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const loc = useLocation();
+  const { role } = useAppUser();
+  const visibleTabs = tabs.filter((tab) => {
+    if (role === "patient") return tab.to !== "/doctor" && tab.to !== "/admin";
+    if (role === "doctor" || role === "environmental") return tab.to !== "/checkin" && tab.to !== "/admin";
+    return tab.to !== "/checkin";
+  });
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto w-full max-w-md min-h-screen pb-24 relative">
         {children}
       </div>
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-card/95 backdrop-blur-xl border-t border-border z-50">
-        <div className="grid grid-cols-5 px-2 py-2">
-          {tabs.map((t) => {
+        <div className={`grid px-2 py-2 ${visibleTabs.length === 5 ? "grid-cols-5" : "grid-cols-4"}`}>
+          {visibleTabs.map((t) => {
             const active = loc.pathname === t.to;
             const Icon = t.icon;
             return (

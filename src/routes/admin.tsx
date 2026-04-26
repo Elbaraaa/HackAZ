@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { useAppUser } from "@/hooks/use-app-user";
-import { getAdminAnalyticsSnapshot } from "@/lib/app-data";
+import { approveAccount, type AccountRecord, getAdminAnalyticsSnapshot, getPendingAccounts } from "@/lib/app-data";
 import { useStore } from "@/lib/store";
-import { Activity, ShieldAlert, Stethoscope, Users } from "lucide-react";
+import { Activity, Check, ShieldAlert, Stethoscope, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -16,10 +18,49 @@ export const Route = createFileRoute("/admin")({
 });
 
 function Admin() {
-  const { isAuthenticated, loginWithRedirect, role } = useAppUser();
+  const { isAuthenticated, role } = useAppUser();
+  const [pendingAccounts, setPendingAccounts] = useState<AccountRecord[]>([]);
+  const [approvalQueueLoading, setApprovalQueueLoading] = useState(false);
   const signals = useStore((s) => s.signals);
   const snapshot = getAdminAnalyticsSnapshot(signals.length);
   const highRiskClusters = signals.filter((s) => s.severity === "high").length;
+  const allowed = role === "admin";
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPendingAccounts() {
+      if (!allowed) {
+        setPendingAccounts([]);
+        return;
+      }
+
+      setApprovalQueueLoading(true);
+      try {
+        const response = await fetch("/api/admin/pending-accounts", { credentials: "include" });
+        const data = await response.json().catch(() => ({}));
+
+        if (!active) return;
+
+        if (data.configured === false) {
+          setPendingAccounts(getPendingAccounts());
+        } else if (response.ok) {
+          setPendingAccounts(data.accounts ?? []);
+        } else {
+          toast.error(data.error || "Could not load pending accounts.");
+        }
+      } catch {
+        if (active) setPendingAccounts(getPendingAccounts());
+      } finally {
+        if (active) setApprovalQueueLoading(false);
+      }
+    }
+
+    void loadPendingAccounts();
+    return () => {
+      active = false;
+    };
+  }, [allowed]);
 
   if (!isAuthenticated) {
     return (
@@ -30,21 +71,13 @@ function Admin() {
             <ShieldAlert className="h-8 w-8 text-warning" />
             <h1 className="mt-4 text-2xl font-extrabold text-navy">Admin access</h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Sign in with an Auth0 account that has the admin role claim to view analytics.
+              Choose the admin workspace to view analytics and system controls.
             </p>
-            <button
-              onClick={() => loginWithRedirect()}
-              className="mt-4 w-full rounded-xl bg-navy py-3 text-sm font-semibold text-white"
-            >
-              Log in
-            </button>
           </div>
         </section>
       </AppShell>
     );
   }
-
-  const allowed = role === "admin";
 
   return (
     <AppShell>
@@ -60,9 +93,9 @@ function Admin() {
       {!allowed ? (
         <section className="px-5 mt-5">
           <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4">
-            <p className="text-sm font-bold text-warning">Your Auth0 user is not marked as admin.</p>
+            <p className="text-sm font-bold text-warning">This workspace is not admin.</p>
             <p className="mt-1 text-[12px] leading-relaxed text-navy">
-              Add an Auth0 role/custom claim for this user before exposing production analytics.
+              This workspace is scoped away from admin tools. Log out and choose Admin console.
             </p>
           </div>
         </section>
@@ -75,6 +108,64 @@ function Admin() {
         <Metric icon={<ShieldAlert className="h-4 w-4" />} label="High risk" value={highRiskClusters} />
       </section>
 
+      {allowed ? (
+        <section className="px-5 mt-5">
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[14px] font-bold text-navy">Reviewer approval queue</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  Doctor and environmental accounts require admin approval before login.
+                </p>
+              </div>
+              <span className="rounded-full bg-warning/10 px-2.5 py-1 text-[11px] font-bold text-warning">
+                {approvalQueueLoading ? "..." : pendingAccounts.length}
+              </span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {approvalQueueLoading ? (
+                <p className="rounded-xl bg-surface p-3 text-[12px] font-semibold text-muted-foreground">
+                  Loading reviewer requests...
+                </p>
+              ) : pendingAccounts.length ? (
+                pendingAccounts.map((account) => (
+                  <PendingAccount
+                    key={account.email}
+                    account={account}
+                    onApprove={async () => {
+                      try {
+                        const response = await fetch("/api/admin/approve-account", {
+                          method: "POST",
+                          credentials: "include",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ email: account.email }),
+                        });
+                        const data = await response.json().catch(() => ({}));
+
+                        if (data.configured === false) {
+                          approveAccount(account.email, "admin");
+                        } else if (!response.ok) {
+                          throw new Error(data.error || "Could not approve account.");
+                        }
+
+                        setPendingAccounts((current) => current.filter((item) => item.email !== account.email));
+                        toast.success("Reviewer account approved");
+                      } catch (error) {
+                        toast.error(error instanceof Error ? error.message : "Could not approve account.");
+                      }
+                    }}
+                  />
+                ))
+              ) : (
+                <p className="rounded-xl bg-success/10 p-3 text-[12px] font-semibold text-success">
+                  No reviewer accounts are waiting for approval.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="px-5 mt-5">
         <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
           <p className="text-[14px] font-bold text-navy">Next database-backed views</p>
@@ -86,6 +177,39 @@ function Admin() {
         </div>
       </section>
     </AppShell>
+  );
+}
+
+function PendingAccount({ account, onApprove }: { account: AccountRecord; onApprove: () => void }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-bold text-navy">{account.name}</p>
+          <p className="mt-0.5 text-[11px] font-semibold text-teal capitalize">
+            {account.role === "environmental" ? "Environmental reviewer" : "Doctor reviewer"}
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{account.email}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onApprove}
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-teal px-2.5 py-1.5 text-[11px] font-bold text-white"
+        >
+          <Check className="h-3.5 w-3.5" />
+          Approve
+        </button>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+        <p><span className="font-bold text-navy">ID:</span> {account.uniqueId}</p>
+        <p><span className="font-bold text-navy">ZIP:</span> {account.postalCode}</p>
+        <p className="col-span-2"><span className="font-bold text-navy">Org:</span> {account.organization || account.householdMemberId}</p>
+        <p className="col-span-2"><span className="font-bold text-navy">Location:</span> {account.physicalLocation}</p>
+      </div>
+      {account.approvalNote ? (
+        <p className="mt-2 rounded-lg bg-card p-2 text-[11px] leading-relaxed text-navy">{account.approvalNote}</p>
+      ) : null}
+    </div>
   );
 }
 

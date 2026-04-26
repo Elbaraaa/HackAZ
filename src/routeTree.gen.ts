@@ -21,6 +21,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiGemmaSummarizeVoiceRouteImport } from './routes/api/gemma.summarize-voice'
 import { Route as ApiGemmaAnalyzeImageRouteImport } from './routes/api/gemma.analyze-image'
 import { Route as ApiBackboardSessionRouteImport } from './routes/api/backboard.session'
+import { Route as ApiAuthSignupRouteImport } from './routes/api/auth.signup'
+import { Route as ApiAuthSessionRouteImport } from './routes/api/auth.session'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth.logout'
+import { Route as ApiAuthLoginRouteImport } from './routes/api/auth.login'
+import { Route as ApiAdminPendingAccountsRouteImport } from './routes/api/admin.pending-accounts'
+import { Route as ApiAdminApproveAccountRouteImport } from './routes/api/admin.approve-account'
 
 const RewardsRoute = RewardsRouteImport.update({
   id: '/rewards',
@@ -82,6 +88,36 @@ const ApiBackboardSessionRoute = ApiBackboardSessionRouteImport.update({
   path: '/api/backboard/session',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthSignupRoute = ApiAuthSignupRouteImport.update({
+  id: '/api/auth/signup',
+  path: '/api/auth/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthSessionRoute = ApiAuthSessionRouteImport.update({
+  id: '/api/auth/session',
+  path: '/api/auth/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/api/auth/logout',
+  path: '/api/auth/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
+  id: '/api/auth/login',
+  path: '/api/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminPendingAccountsRoute = ApiAdminPendingAccountsRouteImport.update({
+  id: '/api/admin/pending-accounts',
+  path: '/api/admin/pending-accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminApproveAccountRoute = ApiAdminApproveAccountRouteImport.update({
+  id: '/api/admin/approve-account',
+  path: '/api/admin/approve-account',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -93,6 +129,12 @@ export interface FileRoutesByFullPath {
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/rewards': typeof RewardsRoute
+  '/api/admin/approve-account': typeof ApiAdminApproveAccountRoute
+  '/api/admin/pending-accounts': typeof ApiAdminPendingAccountsRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/session': typeof ApiAuthSessionRoute
+  '/api/auth/signup': typeof ApiAuthSignupRoute
   '/api/backboard/session': typeof ApiBackboardSessionRoute
   '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
   '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
@@ -107,6 +149,12 @@ export interface FileRoutesByTo {
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/rewards': typeof RewardsRoute
+  '/api/admin/approve-account': typeof ApiAdminApproveAccountRoute
+  '/api/admin/pending-accounts': typeof ApiAdminPendingAccountsRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/session': typeof ApiAuthSessionRoute
+  '/api/auth/signup': typeof ApiAuthSignupRoute
   '/api/backboard/session': typeof ApiBackboardSessionRoute
   '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
   '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
@@ -122,6 +170,12 @@ export interface FileRoutesById {
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/rewards': typeof RewardsRoute
+  '/api/admin/approve-account': typeof ApiAdminApproveAccountRoute
+  '/api/admin/pending-accounts': typeof ApiAdminPendingAccountsRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/session': typeof ApiAuthSessionRoute
+  '/api/auth/signup': typeof ApiAuthSignupRoute
   '/api/backboard/session': typeof ApiBackboardSessionRoute
   '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
   '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
@@ -138,6 +192,12 @@ export interface FileRouteTypes {
     | '/public-health'
     | '/report'
     | '/rewards'
+    | '/api/admin/approve-account'
+    | '/api/admin/pending-accounts'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/session'
+    | '/api/auth/signup'
     | '/api/backboard/session'
     | '/api/gemma/analyze-image'
     | '/api/gemma/summarize-voice'
@@ -152,6 +212,12 @@ export interface FileRouteTypes {
     | '/public-health'
     | '/report'
     | '/rewards'
+    | '/api/admin/approve-account'
+    | '/api/admin/pending-accounts'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/session'
+    | '/api/auth/signup'
     | '/api/backboard/session'
     | '/api/gemma/analyze-image'
     | '/api/gemma/summarize-voice'
@@ -166,6 +232,12 @@ export interface FileRouteTypes {
     | '/public-health'
     | '/report'
     | '/rewards'
+    | '/api/admin/approve-account'
+    | '/api/admin/pending-accounts'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/session'
+    | '/api/auth/signup'
     | '/api/backboard/session'
     | '/api/gemma/analyze-image'
     | '/api/gemma/summarize-voice'
@@ -181,6 +253,12 @@ export interface RootRouteChildren {
   PublicHealthRoute: typeof PublicHealthRoute
   ReportRoute: typeof ReportRoute
   RewardsRoute: typeof RewardsRoute
+  ApiAdminApproveAccountRoute: typeof ApiAdminApproveAccountRoute
+  ApiAdminPendingAccountsRoute: typeof ApiAdminPendingAccountsRoute
+  ApiAuthLoginRoute: typeof ApiAuthLoginRoute
+  ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
+  ApiAuthSessionRoute: typeof ApiAuthSessionRoute
+  ApiAuthSignupRoute: typeof ApiAuthSignupRoute
   ApiBackboardSessionRoute: typeof ApiBackboardSessionRoute
   ApiGemmaAnalyzeImageRoute: typeof ApiGemmaAnalyzeImageRoute
   ApiGemmaSummarizeVoiceRoute: typeof ApiGemmaSummarizeVoiceRoute
@@ -272,6 +350,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBackboardSessionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/signup': {
+      id: '/api/auth/signup'
+      path: '/api/auth/signup'
+      fullPath: '/api/auth/signup'
+      preLoaderRoute: typeof ApiAuthSignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/session': {
+      id: '/api/auth/session'
+      path: '/api/auth/session'
+      fullPath: '/api/auth/session'
+      preLoaderRoute: typeof ApiAuthSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/api/auth/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/login': {
+      id: '/api/auth/login'
+      path: '/api/auth/login'
+      fullPath: '/api/auth/login'
+      preLoaderRoute: typeof ApiAuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/pending-accounts': {
+      id: '/api/admin/pending-accounts'
+      path: '/api/admin/pending-accounts'
+      fullPath: '/api/admin/pending-accounts'
+      preLoaderRoute: typeof ApiAdminPendingAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/approve-account': {
+      id: '/api/admin/approve-account'
+      path: '/api/admin/approve-account'
+      fullPath: '/api/admin/approve-account'
+      preLoaderRoute: typeof ApiAdminApproveAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -285,6 +405,12 @@ const rootRouteChildren: RootRouteChildren = {
   PublicHealthRoute: PublicHealthRoute,
   ReportRoute: ReportRoute,
   RewardsRoute: RewardsRoute,
+  ApiAdminApproveAccountRoute: ApiAdminApproveAccountRoute,
+  ApiAdminPendingAccountsRoute: ApiAdminPendingAccountsRoute,
+  ApiAuthLoginRoute: ApiAuthLoginRoute,
+  ApiAuthLogoutRoute: ApiAuthLogoutRoute,
+  ApiAuthSessionRoute: ApiAuthSessionRoute,
+  ApiAuthSignupRoute: ApiAuthSignupRoute,
   ApiBackboardSessionRoute: ApiBackboardSessionRoute,
   ApiGemmaAnalyzeImageRoute: ApiGemmaAnalyzeImageRoute,
   ApiGemmaSummarizeVoiceRoute: ApiGemmaSummarizeVoiceRoute,

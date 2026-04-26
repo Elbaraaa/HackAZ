@@ -1,22 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ensureBackboardThread, getBackboardClient } from "@/lib/server/backboard";
-import { verifyAuth0Request } from "@/lib/server/auth0";
 
 export const Route = createFileRoute("/api/backboard/session")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const user = await verifyAuth0Request(request);
           const body = (await request.json().catch(() => ({}))) as {
             threadId?: string;
             message?: string;
+            userId?: string;
+            role?: string;
           };
           const session = await ensureBackboardThread(body.threadId);
 
           if (!body.message) {
             return Response.json({
-              user: { sub: user.sub, roles: user.roles },
+              user: { id: body.userId ?? "local-user", role: body.role ?? "patient" },
               threadId: session.threadId,
               created: session.created,
             });
@@ -29,13 +29,14 @@ export const Route = createFileRoute("/api/backboard/session")({
             llm_provider: process.env.BACKBOARD_MODEL_PROVIDER,
             model_name: process.env.BACKBOARD_MODEL_NAME,
             metadata: {
-              auth0Sub: user.sub,
-              source: "outbreakiq",
+              userId: body.userId ?? "local-user",
+              role: body.role ?? "patient",
+              source: "bloomy",
             },
           });
 
           return Response.json({
-            user: { sub: user.sub, roles: user.roles },
+            user: { id: body.userId ?? "local-user", role: body.role ?? "patient" },
             threadId: session.threadId,
             created: session.created,
             response: "content" in response ? response.content : null,
@@ -49,4 +50,3 @@ export const Route = createFileRoute("/api/backboard/session")({
     },
   },
 });
-

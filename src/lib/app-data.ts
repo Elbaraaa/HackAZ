@@ -1,27 +1,77 @@
-export type AppRole = "patient" | "doctor" | "admin";
+export type AppRole = "patient" | "doctor" | "environmental" | "admin";
+export type AccountStatus = "approved" | "pending" | "rejected";
+
+export type Sex = "female" | "male" | "intersex" | "prefer-not-to-say" | "other";
+
+export type LocationType = "home" | "workplace" | "school" | "farm" | "clinic" | "public-space" | "other";
+
+export type SignupProfileInput = {
+  name: string;
+  email: string;
+  password: string;
+  role: AppRole;
+  age: number;
+  sex: Sex;
+  uniqueId: string;
+  occupation: string;
+  dateOfReport: string;
+  postalCode: string;
+  phoneNumber: string;
+  householdMemberId: string;
+  physicalLocation: string;
+  locationType: LocationType;
+  organization?: string;
+  approvalNote?: string;
+};
+
+export type AccountRecord = Omit<SignupProfileInput, "password" | "dateOfReport"> & {
+  id: string;
+  password: string;
+  dateOfReport: string;
+  createdAt: string;
+  workspaceId: string;
+  status: AccountStatus;
+  approvedAt?: string;
+  approvedBy?: string;
+};
 
 export type AppUserProfile = {
-  auth0Sub: string;
+  id: string;
   email?: string;
   name?: string;
   role: AppRole;
+  workspaceId: string;
   doctorProfileId?: string;
   patientProfileId?: string;
   backboardThreadId?: string;
+  age?: number;
+  sex?: Sex;
+  uniqueId?: string;
+  occupation?: string;
+  dateOfReport?: string;
+  postalCode?: string;
+  phoneNumber?: string;
+  householdMemberId?: string;
+  physicalLocation?: string;
+  locationType?: LocationType;
+  organization?: string;
+  approvalNote?: string;
+  approvalStatus?: AccountStatus;
 };
 
 export type DoctorProfile = {
   id: string;
-  userAuth0Sub: string;
+  userId: string;
   displayName: string;
   specialty: string;
   organization: string;
   verified: boolean;
+  reviewLane: "clinical" | "veterinary" | "environmental";
 };
 
 export type PatientProfile = {
   id: string;
-  userAuth0Sub: string;
+  userId: string;
   displayName: string;
   zip: string;
   assignedDoctorIds: string[];
@@ -34,16 +84,18 @@ export type AdminAnalyticsSnapshot = {
   highRiskClusters: number;
 };
 
-const STORAGE_KEY = "outbreakiq.appData.v1";
+const STORAGE_KEY = "bloomy.appData.v2";
 
 type AppDataState = {
   users: Record<string, AppUserProfile>;
+  accounts: Record<string, AccountRecord>;
   doctors: Record<string, DoctorProfile>;
   patients: Record<string, PatientProfile>;
 };
 
 const initialState: AppDataState = {
   users: {},
+  accounts: {},
   doctors: {},
   patients: {},
 };
@@ -64,95 +116,384 @@ function writeState(state: AppDataState) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-function inferRole(user: { [key: string]: unknown }): AppRole {
-  const roles =
-    (user["https://outbreakiq.app/roles"] as string[] | undefined) ||
-    (user["https://sentinel-health.app/roles"] as string[] | undefined) ||
-    (user.roles as string[] | undefined) ||
-    [];
-
-  if (roles.includes("admin")) return "admin";
-  if (roles.includes("doctor")) return "doctor";
-  return "patient";
+function cleanId(value: string) {
+  return value.replace(/[^a-z0-9]/gi, "-").toLowerCase();
 }
 
-export function upsertUserProfile(user: {
-  sub?: string;
-  email?: string;
-  name?: string;
-  [key: string]: unknown;
-}): AppUserProfile | null {
-  if (!user.sub) return null;
+function accountKey(email: string) {
+  return email.trim().toLowerCase();
+}
 
-  const state = readState();
-  const existing = state.users[user.sub];
-  const role = existing?.role ?? inferRole(user);
-  const next: AppUserProfile = {
-    auth0Sub: user.sub,
-    email: user.email,
-    name: user.name,
-    role,
+function workspaceFor(role: AppRole, id: string) {
+  return `${role}-${cleanId(id)}`;
+}
+
+function defaultReviewLane(input: { role: AppRole; occupation?: string; uniqueId?: string }) {
+  if (input.role === "environmental") return "environmental";
+  const haystack = `${input.occupation ?? ""} ${input.uniqueId ?? ""}`.toLowerCase();
+  if (haystack.includes("vet") || haystack.includes("animal")) return "veterinary";
+  if (haystack.includes("environment") || haystack.includes("public health") || haystack.includes("water")) return "environmental";
+  return "clinical";
+}
+
+function seedAccounts(state: AppDataState) {
+  const seeded: SignupProfileInput[] = [
+    {
+      role: "patient",
+      name: "Community user",
+      email: "patient@bloomy.local",
+      password: "bloomy123",
+      age: 28,
+      sex: "prefer-not-to-say",
+      uniqueId: "patient-demo",
+      occupation: "Student",
+      dateOfReport: new Date().toISOString().slice(0, 10),
+      postalCode: "85719",
+      phoneNumber: "555-0101",
+      householdMemberId: "HH-001",
+      physicalLocation: "Tucson, AZ",
+      locationType: "home",
+      organization: "",
+    },
+    {
+      role: "doctor",
+      name: "Clinical reviewer",
+      email: "doctor@bloomy.local",
+      password: "bloomy123",
+      age: 41,
+      sex: "prefer-not-to-say",
+      uniqueId: "doctor-demo",
+      occupation: "Doctor",
+      dateOfReport: new Date().toISOString().slice(0, 10),
+      postalCode: "85719",
+      phoneNumber: "555-0202",
+      householdMemberId: "CLINIC-001",
+      physicalLocation: "Bloomy Review Clinic, Tucson, AZ",
+      locationType: "clinic",
+      organization: "Bloomy Review Clinic",
+    },
+    {
+      role: "environmental",
+      name: "Environmental health officer",
+      email: "environmental@bloomy.local",
+      password: "bloomy123",
+      age: 38,
+      sex: "prefer-not-to-say",
+      uniqueId: "environmental-demo",
+      occupation: "Environmental health officer",
+      dateOfReport: new Date().toISOString().slice(0, 10),
+      postalCode: "85705",
+      phoneNumber: "555-0250",
+      householdMemberId: "ENV-001",
+      physicalLocation: "Pima County Environmental Health",
+      locationType: "workplace",
+      organization: "Pima County Environmental Health",
+    },
+    {
+      role: "admin",
+      name: "Admin operator",
+      email: "admin@bloomy.local",
+      password: "bloomy123",
+      age: 35,
+      sex: "prefer-not-to-say",
+      uniqueId: "admin-demo",
+      occupation: "Public health admin",
+      dateOfReport: new Date().toISOString().slice(0, 10),
+      postalCode: "85719",
+      phoneNumber: "555-0303",
+      householdMemberId: "ADMIN-001",
+      physicalLocation: "Pima County Operations Center",
+      locationType: "workplace",
+      organization: "Bloomy",
+    },
+  ];
+
+  seeded.forEach((account) => {
+    const key = accountKey(account.email);
+    if (state.accounts[key]) {
+      if (!state.accounts[key].status) {
+        state.accounts[key] = {
+          ...state.accounts[key],
+          status: "approved",
+          approvedAt: state.accounts[key].approvedAt ?? new Date().toISOString(),
+          approvedBy: state.accounts[key].approvedBy ?? "system",
+        };
+      }
+      return;
+    }
+
+    const id = cleanId(account.uniqueId || account.email);
+    const record: AccountRecord = {
+      ...account,
+      id,
+      email: accountKey(account.email),
+      workspaceId: workspaceFor(account.role, id),
+      createdAt: new Date().toISOString(),
+      status: "approved",
+      approvedAt: new Date().toISOString(),
+      approvedBy: "system",
+    };
+    state.accounts[key] = record;
+    state.users[id] = profileFromAccount(record, state.users[id]);
+  });
+
+  return state;
+}
+
+function profileFromAccount(account: AccountRecord, existing?: AppUserProfile): AppUserProfile {
+  return {
+    id: account.id,
+    email: account.email,
+    name: account.name,
+    role: account.role,
+    workspaceId: account.workspaceId,
     doctorProfileId: existing?.doctorProfileId,
     patientProfileId: existing?.patientProfileId,
     backboardThreadId: existing?.backboardThreadId,
+    age: account.age,
+    sex: account.sex,
+    uniqueId: account.uniqueId,
+    occupation: account.occupation,
+    dateOfReport: account.dateOfReport,
+    postalCode: account.postalCode,
+    phoneNumber: account.phoneNumber,
+    householdMemberId: account.householdMemberId,
+    physicalLocation: account.physicalLocation,
+    locationType: account.locationType,
+    organization: account.organization,
+    approvalNote: account.approvalNote,
+    approvalStatus: account.status,
   };
+}
 
-  state.users[user.sub] = next;
+function ensureRoleProfile(state: AppDataState, profile: AppUserProfile) {
+  const next = { ...profile };
 
-  if (role === "doctor" && !next.doctorProfileId) {
-    const id = `doctor-${user.sub.replace(/[^a-z0-9]/gi, "-")}`;
+  if ((next.role === "doctor" || next.role === "environmental") && !next.doctorProfileId) {
+    const id = `doctor-${cleanId(next.id)}`;
     state.doctors[id] = {
       id,
-      userAuth0Sub: user.sub,
-      displayName: user.name || "Clinical reviewer",
-      specialty: "Family medicine",
-      organization: "Bloomy Partner Network",
+      userId: next.id,
+      displayName: next.name || "Clinical reviewer",
+      specialty: next.occupation || "Community health review",
+      organization: "Bloomy Review Network",
       verified: true,
+      reviewLane: defaultReviewLane({
+        role: next.role,
+        occupation: next.occupation,
+        uniqueId: next.uniqueId,
+      }),
     };
     next.doctorProfileId = id;
-    state.users[user.sub] = next;
+  } else if ((next.role === "doctor" || next.role === "environmental") && next.doctorProfileId && state.doctors[next.doctorProfileId]) {
+    state.doctors[next.doctorProfileId] = {
+      ...state.doctors[next.doctorProfileId],
+      reviewLane:
+        state.doctors[next.doctorProfileId].reviewLane ??
+        defaultReviewLane({
+          role: next.role,
+          occupation: next.occupation,
+          uniqueId: next.uniqueId,
+        }),
+    };
   }
 
-  if (role === "patient" && !next.patientProfileId) {
-    const id = `patient-${user.sub.replace(/[^a-z0-9]/gi, "-")}`;
+  if (next.role === "patient" && !next.patientProfileId) {
+    const id = `patient-${cleanId(next.id)}`;
     state.patients[id] = {
       id,
-      userAuth0Sub: user.sub,
-      displayName: user.name || "Community reporter",
-      zip: "85719",
+      userId: next.id,
+      displayName: next.name || "Community reporter",
+      zip: next.postalCode || "85719",
       assignedDoctorIds: [],
     };
     next.patientProfileId = id;
-    state.users[user.sub] = next;
   }
 
-  writeState(state);
+  state.users[next.id] = next;
   return next;
 }
 
-export function saveBackboardThread(auth0Sub: string, threadId: string) {
+export function createLocalAccount(input: SignupProfileInput): AppUserProfile {
+  const state = seedAccounts(readState());
+  const email = accountKey(input.email);
+
+  if (input.role === "admin") {
+    throw new Error("Admin accounts must be provisioned by an existing admin.");
+  }
+
+  if (!email || !input.password || !input.name.trim() || !input.uniqueId.trim()) {
+    throw new Error("Please complete the required account fields.");
+  }
+
+  if (input.password.length < 6) {
+    throw new Error("Password must be at least 6 characters.");
+  }
+
+  if (!input.postalCode.trim() || !input.phoneNumber.trim() || !input.householdMemberId.trim()) {
+    throw new Error("Please add postal code, phone number, and household member ID.");
+  }
+
+  if (!input.physicalLocation.trim() || !input.locationType) {
+    throw new Error("Please add the physical location and type of location.");
+  }
+
+  if (!Number.isFinite(input.age) || input.age < 0) {
+    throw new Error("Please enter a valid age.");
+  }
+
+  if (state.accounts[email]) {
+    throw new Error("An account already exists for that email.");
+  }
+
+  const id = cleanId(input.uniqueId || input.email);
+  if (state.users[id]) {
+    throw new Error("That unique ID is already in use.");
+  }
+
+  const account: AccountRecord = {
+    ...input,
+    id,
+    email,
+    postalCode: input.postalCode.trim(),
+    phoneNumber: input.phoneNumber.trim(),
+    householdMemberId: input.householdMemberId.trim(),
+    physicalLocation: input.physicalLocation.trim(),
+    locationType: input.locationType,
+    organization: input.organization?.trim(),
+    approvalNote: input.approvalNote?.trim(),
+    uniqueId: input.uniqueId.trim(),
+    occupation: input.occupation.trim(),
+    name: input.name.trim(),
+    workspaceId: workspaceFor(input.role, id),
+    createdAt: new Date().toISOString(),
+    status: input.role === "patient" ? "approved" : "pending",
+    approvedAt: input.role === "patient" ? new Date().toISOString() : undefined,
+    approvedBy: input.role === "patient" ? "self-service" : undefined,
+  };
+
+  state.accounts[email] = account;
+  const profile = ensureRoleProfile(state, profileFromAccount(account));
+  writeState(state);
+  return profile;
+}
+
+export function authenticateLocalAccount(input: {
+  role: AppRole;
+  email: string;
+  password: string;
+}): AppUserProfile {
+  const state = seedAccounts(readState());
+  const account = state.accounts[accountKey(input.email)];
+
+  if (!account || account.password !== input.password) {
+    writeState(state);
+    throw new Error("Email or password is incorrect.");
+  }
+
+  if (account.role !== input.role) {
+    writeState(state);
+    throw new Error("This account belongs to a different workspace.");
+  }
+
+  if (account.status !== "approved") {
+    writeState(state);
+    throw new Error("This account is waiting for admin approval.");
+  }
+
+  const profile = ensureRoleProfile(state, profileFromAccount(account, state.users[account.id]));
+  writeState(state);
+  return profile;
+}
+
+export function upsertLocalUserProfile(user: {
+  id: string;
+  email?: string;
+  name?: string;
+  role: AppRole;
+}): AppUserProfile {
+  const state = seedAccounts(readState());
+  const existing = state.users[user.id];
+  const account = user.email ? state.accounts[accountKey(user.email)] : undefined;
+  const workspaceId = account?.workspaceId ?? workspaceFor(user.role, user.id);
+  const next: AppUserProfile = {
+    id: user.id,
+    email: account?.email ?? user.email,
+    name: account?.name ?? user.name,
+    role: user.role,
+    workspaceId,
+    doctorProfileId: existing?.doctorProfileId,
+    patientProfileId: existing?.patientProfileId,
+    backboardThreadId: existing?.backboardThreadId,
+    age: account?.age ?? existing?.age,
+    sex: account?.sex ?? existing?.sex,
+    uniqueId: account?.uniqueId ?? existing?.uniqueId,
+    occupation: account?.occupation ?? existing?.occupation,
+    dateOfReport: account?.dateOfReport ?? existing?.dateOfReport,
+    postalCode: account?.postalCode ?? existing?.postalCode,
+    phoneNumber: account?.phoneNumber ?? existing?.phoneNumber,
+    householdMemberId: account?.householdMemberId ?? existing?.householdMemberId,
+    physicalLocation: account?.physicalLocation ?? existing?.physicalLocation,
+    locationType: account?.locationType ?? existing?.locationType,
+    organization: account?.organization ?? existing?.organization,
+    approvalNote: account?.approvalNote ?? existing?.approvalNote,
+    approvalStatus: account?.status ?? existing?.approvalStatus,
+  };
+
+  const profile = ensureRoleProfile(state, next);
+  writeState(state);
+  return profile;
+}
+
+export function saveBackboardThread(userId: string, threadId: string) {
   const state = readState();
-  const user = state.users[auth0Sub];
+  const user = state.users[userId];
   if (!user) return;
-  state.users[auth0Sub] = { ...user, backboardThreadId: threadId };
+  state.users[userId] = { ...user, backboardThreadId: threadId };
   writeState(state);
 }
 
-export function getCurrentProfile(auth0Sub?: string) {
-  if (!auth0Sub) return null;
-  return readState().users[auth0Sub] ?? null;
+export function getCurrentProfile(userId?: string) {
+  if (!userId) return null;
+  return readState().users[userId] ?? null;
 }
 
 export function getDoctorProfile(id?: string) {
   if (!id) return null;
-  return readState().doctors[id] ?? null;
+  return seedAccounts(readState()).doctors[id] ?? null;
+}
+
+export function getPendingAccounts() {
+  const state = seedAccounts(readState());
+  writeState(state);
+  return Object.values(state.accounts)
+    .filter((account) => account.status === "pending")
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+}
+
+export function approveAccount(email: string, approvedBy = "admin") {
+  const state = seedAccounts(readState());
+  const key = accountKey(email);
+  const account = state.accounts[key];
+  if (!account) return null;
+
+  const next: AccountRecord = {
+    ...account,
+    status: "approved",
+    approvedAt: new Date().toISOString(),
+    approvedBy,
+  };
+  state.accounts[key] = next;
+  const profile = ensureRoleProfile(state, profileFromAccount(next, state.users[next.id]));
+  writeState(state);
+  return profile;
 }
 
 export function getAdminAnalyticsSnapshot(activeSignals: number): AdminAnalyticsSnapshot {
   const state = readState();
   return {
     activeUsers: Object.keys(state.users).length,
-    activeDoctors: Object.values(state.users).filter((u) => u.role === "doctor").length,
+    activeDoctors: Object.values(state.users).filter((u) => u.role === "doctor" || u.role === "environmental").length,
     activeSignals,
     highRiskClusters: 0,
   };

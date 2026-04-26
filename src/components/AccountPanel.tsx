@@ -3,16 +3,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useAppUser } from "@/hooks/use-app-user";
 import { getCurrentProfile, saveBackboardThread } from "@/lib/app-data";
-import { isAuthConfigured } from "@/lib/auth-config";
 
 export function AccountPanel() {
-  const { isAuthenticated, loginWithRedirect, getAccessTokenSilently, user, profile } = useAppUser();
+  const { isAuthenticated, getAccessTokenSilently, user, profile } = useAppUser();
   const [loading, setLoading] = useState(false);
   const [threadId, setThreadId] = useState(profile?.backboardThreadId);
 
   const connectBackboard = async () => {
     if (!isAuthenticated || !user?.sub) {
-      await loginWithRedirect();
       return;
     }
 
@@ -26,7 +24,11 @@ export function AccountPanel() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ threadId: current?.backboardThreadId }),
+        body: JSON.stringify({
+          threadId: current?.backboardThreadId,
+          userId: user.sub,
+          role: profile?.role ?? "patient",
+        }),
       });
 
       const data = (await response.json()) as { threadId?: string; error?: string };
@@ -57,16 +59,16 @@ export function AccountPanel() {
             </p>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
               {isAuthenticated
-                ? `Role: ${profile?.role ?? "patient"}. Auth0 keeps the login session, and Backboard can persist the AI thread.`
-                : "Log in with Auth0 to keep your own check-ins, role, and AI session separate."}
+                ? `Role: ${profile?.role ?? "patient"}. Bloomy keeps this workspace separate, and Backboard can persist the AI thread.`
+                : "Choose a workspace to keep your check-ins, role, and AI session separate."}
             </p>
           </div>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
-            onClick={() => (isAuthenticated ? connectBackboard() : loginWithRedirect())}
-            disabled={!isAuthConfigured() || loading}
+            onClick={connectBackboard}
+            disabled={!isAuthenticated || loading}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-3 py-3 text-[12px] font-semibold text-white disabled:opacity-50"
           >
             <Brain className="h-4 w-4" />
@@ -81,4 +83,3 @@ export function AccountPanel() {
     </section>
   );
 }
-

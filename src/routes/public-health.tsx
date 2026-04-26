@@ -3,6 +3,7 @@ import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { useStore } from "@/lib/store";
 import { Bug, ChevronRight, Cloud, Gift, Heart, Microscope, ShieldCheck, Stethoscope, Watch } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { useAppUser } from "@/hooks/use-app-user";
 
 export const Route = createFileRoute("/public-health")({
   head: () => ({
@@ -32,7 +33,25 @@ const SOURCES = [
 ];
 
 function PublicHealth() {
+  const { role } = useAppUser();
   const signals = useStore((s) => s.signals);
+
+  if (role !== "admin") {
+    return (
+      <AppShell>
+        <TopBar title="Public Health" back="/" pill={<StatusPill tone="warn">Admin only</StatusPill>} />
+        <section className="px-5 pt-8">
+          <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4">
+            <ShieldCheck className="h-8 w-8 text-warning" />
+            <h1 className="mt-4 text-2xl font-extrabold text-navy">Admin workspace required</h1>
+            <p className="mt-2 text-sm leading-relaxed text-navy">
+              Public health oversight is separated from doctor review queues. Log out and choose Admin console to view this dashboard.
+            </p>
+          </div>
+        </section>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>

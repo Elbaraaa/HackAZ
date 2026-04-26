@@ -6,6 +6,7 @@ import { computeRisk, simulateVitals, store, type CheckIn, type Symptom } from "
 import { requestApproxLocation, type ApproxLocation } from "@/lib/location";
 import { rewardAudience } from "@/lib/rewards";
 import { analyzeSymptoms, type SymptomTriage } from "@/lib/symptom-triage";
+import { useAppUser } from "@/hooks/use-app-user";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/checkin")({
@@ -38,6 +39,7 @@ const SYMPTOMS: { id: Symptom; label: string }[] = [
 
 function CheckIn() {
   const navigate = useNavigate();
+  const { user } = useAppUser();
   const [feeling, setFeeling] = useState<CheckIn["feeling"]>("symptoms");
   const [symptoms, setSymptoms] = useState<Symptom[]>(["cough-congestion"]);
   const [otherSymptom, setOtherSymptom] = useState("");
@@ -91,7 +93,7 @@ function CheckIn() {
       risk: r.level,
       approxLocation,
     };
-    store.addCheckIn(ci);
+    store.addCheckIn(ci, { reporterUserId: user?.id });
     toast.success("Signal submitted — generating AI insight…");
     setTimeout(() => navigate({ to: "/insights", search: { id: ci.id } }), 400);
   };

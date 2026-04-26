@@ -4,6 +4,8 @@ import { Activity, AlertTriangle, Bug, ChevronRight, Gift, Heart, MapPin, Sparkl
 import { activeSignals, useStore } from "@/lib/store";
 import { InteractiveRegionMap } from "@/components/InteractiveRegionMap";
 import { useMemo } from "react";
+import { AuthStatus } from "@/components/AuthStatus";
+import { useAppUser } from "@/hooks/use-app-user";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -20,18 +22,23 @@ export const Route = createFileRoute("/")({
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefined;
 
 function Index() {
+  const { role } = useAppUser();
   const signals = useStore((s) => s.signals);
   const streak = useStore((s) => s.streak);
   const points = useStore((s) => s.points);
   const liveSignals = useMemo(() => activeSignals(signals), [signals]);
   const topSignal = liveSignals.find((s) => s.severity === "high") ?? liveSignals[0];
+  const homeCopy = getRoleHomeCopy(role);
 
   return (
     <AppShell>
       <TopBar title="Bloomy" pill={<StatusPill tone="live">AI Surveillance Active</StatusPill>} right={
-        <Link to="/insights" className="w-9 h-9 rounded-full bg-gradient-teal grid place-items-center text-teal-foreground shadow-glow">
-          <Sparkles className="w-4 h-4" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <AuthStatus />
+          <Link to="/insights" className="w-9 h-9 rounded-full bg-gradient-teal grid place-items-center text-teal-foreground shadow-glow">
+            <Sparkles className="w-4 h-4" />
+          </Link>
+        </div>
       }/>
 
       <section className="px-5 pt-4 pb-6">
@@ -43,23 +50,22 @@ function Index() {
           </div>
         </div>
         <h1 className="text-[34px] leading-[1.05] font-extrabold tracking-tight text-navy">
-          Turn everyday<br/>health signals<br/>into early<br/>outbreak warnings.
+          {homeCopy.title}
         </h1>
         <p className="mt-4 text-[15px] leading-relaxed text-muted-foreground">
-          Aggregate community reports, wearable vitals, and AI-driven epidemiology to detect anomalies before they become critical.
+          {homeCopy.body}
         </p>
 
-        <Link to="/checkin" className="mt-6 flex items-center justify-center gap-2 w-full rounded-2xl bg-gradient-hero text-white py-4 font-semibold shadow-elevated active:scale-[0.99] transition-transform">
-          <Heart className="w-4 h-4" /> Start Daily Check-In
+        <Link to={homeCopy.primaryTo} className="mt-6 flex items-center justify-center gap-2 w-full rounded-2xl bg-gradient-hero text-white py-4 font-semibold shadow-elevated active:scale-[0.99] transition-transform">
+          <homeCopy.PrimaryIcon className="w-4 h-4" /> {homeCopy.primaryLabel}
         </Link>
 
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <Link to="/report" className="flex items-center justify-center gap-2 rounded-xl bg-card border border-border py-3 text-[13px] font-semibold text-navy shadow-soft">
-            <Bug className="w-4 h-4 text-warning" /> Report Incident
-          </Link>
-          <Link to="/map" className="flex items-center justify-center gap-2 rounded-xl bg-card border border-border py-3 text-[13px] font-semibold text-navy shadow-soft">
-            <MapPin className="w-4 h-4 text-teal" /> Community Signals
-          </Link>
+          {homeCopy.secondary.map((item) => (
+            <Link key={item.to} to={item.to} className="flex items-center justify-center gap-2 rounded-xl bg-card border border-border py-3 text-[13px] font-semibold text-navy shadow-soft">
+              <item.Icon className={`w-4 h-4 ${item.tone}`} /> {item.label}
+            </Link>
+          ))}
         </div>
       </section>
 
@@ -117,6 +123,62 @@ function Index() {
       </p>
     </AppShell>
   );
+}
+
+function getRoleHomeCopy(role: "patient" | "doctor" | "environmental" | "admin") {
+  if (role === "doctor") {
+    return {
+      title: <>Review your<br/>assigned<br/>health signals.</>,
+      body: "Your workspace only shows the review lanes and cases tied to your doctor account.",
+      primaryTo: "/doctor" as const,
+      primaryLabel: "Open Review Hub",
+      PrimaryIcon: Sparkles,
+      secondary: [
+        { to: "/map" as const, label: "Assigned Signals", Icon: MapPin, tone: "text-teal" },
+        { to: "/rewards" as const, label: "Reviewer Rewards", Icon: Gift, tone: "text-warning" },
+      ],
+    };
+  }
+
+  if (role === "environmental") {
+    return {
+      title: <>Review local<br/>environmental<br/>health signals.</>,
+      body: "Your workspace only shows environmental cases assigned to your account.",
+      primaryTo: "/doctor" as const,
+      primaryLabel: "Open Environmental Hub",
+      PrimaryIcon: Sparkles,
+      secondary: [
+        { to: "/map" as const, label: "Assigned Signals", Icon: MapPin, tone: "text-teal" },
+        { to: "/rewards" as const, label: "Reviewer Rewards", Icon: Gift, tone: "text-warning" },
+      ],
+    };
+  }
+
+  if (role === "admin") {
+    return {
+      title: <>Operate the<br/>Bloomy public<br/>health console.</>,
+      body: "Admin tools stay separated from patient and reviewer workspaces while keeping the system view available.",
+      primaryTo: "/admin" as const,
+      primaryLabel: "Open Admin Console",
+      PrimaryIcon: Sparkles,
+      secondary: [
+        { to: "/map" as const, label: "System Map", Icon: MapPin, tone: "text-teal" },
+        { to: "/doctor" as const, label: "All Review Queues", Icon: Bug, tone: "text-warning" },
+      ],
+    };
+  }
+
+  return {
+    title: <>Turn everyday<br/>health signals<br/>into early<br/>outbreak warnings.</>,
+    body: "Aggregate community reports, wearable vitals, and AI-driven epidemiology to detect anomalies before they become critical.",
+    primaryTo: "/checkin" as const,
+    primaryLabel: "Start Daily Check-In",
+    PrimaryIcon: Heart,
+    secondary: [
+      { to: "/report" as const, label: "Report Incident", Icon: Bug, tone: "text-warning" },
+      { to: "/map" as const, label: "Community Signals", Icon: MapPin, tone: "text-teal" },
+    ],
+  };
 }
 
 function ValueCard({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {

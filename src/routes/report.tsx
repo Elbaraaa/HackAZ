@@ -6,6 +6,7 @@ import { store, type AnimalIncident, type EnvironmentalIncident, type RiskLevel 
 import { requestApproxLocation, type ApproxLocation } from "@/lib/location";
 import { analyzeIncidentImageWithGemma, summarizeVoiceNoteWithGemma } from "@/lib/gemma";
 import { rewardAudience } from "@/lib/rewards";
+import { useAppUser } from "@/hooks/use-app-user";
 import { toast } from "sonner";
 
 type BrowserSpeechRecognition = {
@@ -71,6 +72,7 @@ const ENVIRONMENTAL_INCIDENTS = [
 
 function Report() {
   const nav = useNavigate();
+  const { user } = useAppUser();
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const [reportMode, setReportMode] = useState<"animal" | "environmental">("animal");
   const [species, setSpecies] = useState<AnimalIncident["species"]>("cattle");
@@ -171,7 +173,7 @@ function Report() {
         voiceTranscript: voiceTranscript || undefined,
         voiceSummary: voiceSummary || undefined,
       };
-      store.addEnvironmentalIncident(env);
+      store.addEnvironmentalIncident(env, { reporterUserId: user?.id });
       toast.success(offline ? "Saved offline - will sync when connected" : "Shared with public health review");
       setTimeout(() => nav({ to: "/map" }), 500);
       return;
@@ -191,7 +193,7 @@ function Report() {
       voiceTranscript: voiceTranscript || undefined,
       voiceSummary: voiceSummary || undefined,
     };
-    store.addIncident(ai);
+    store.addIncident(ai, { reporterUserId: user?.id });
     toast.success(offline ? "Saved offline — will sync when connected" : "Shared with VetLink Network");
     setTimeout(() => nav({ to: "/map" }), 500);
   };
