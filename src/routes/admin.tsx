@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { useAppUser } from "@/hooks/use-app-user";
-import { approveAccount, type AccountRecord, getAdminAnalyticsSnapshot, getPendingAccounts } from "@/lib/app-data";
+import { approveAccount, type AccountRecord, getAdminAnalyticsSnapshot, getAdminUserDirectory, getPendingAccounts } from "@/lib/app-data";
 import { useStore } from "@/lib/store";
-import { Activity, Check, ShieldAlert, Stethoscope, Users } from "lucide-react";
+import { Activity, Check, EyeOff, PhoneCall, ShieldAlert, Stethoscope, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -20,11 +20,14 @@ export const Route = createFileRoute("/admin")({
 function Admin() {
   const { isAuthenticated, role } = useAppUser();
   const [pendingAccounts, setPendingAccounts] = useState<AccountRecord[]>([]);
+  const [userDirectory, setUserDirectory] = useState<AccountRecord[]>([]);
   const [approvalQueueLoading, setApprovalQueueLoading] = useState(false);
   const signals = useStore((s) => s.signals);
   const snapshot = getAdminAnalyticsSnapshot(signals.length);
   const highRiskClusters = signals.filter((s) => s.severity === "high").length;
   const allowed = role === "admin";
+  const anonymousCount = userDirectory.filter((account) => account.shareDataAnonymously).length;
+  const followUpCount = userDirectory.filter((account) => account.openToFollowUp).length;
 
   useEffect(() => {
     let active = true;
@@ -32,25 +35,35 @@ function Admin() {
     async function loadPendingAccounts() {
       if (!allowed) {
         setPendingAccounts([]);
+        setUserDirectory([]);
         return;
       }
 
       setApprovalQueueLoading(true);
       try {
-        const response = await fetch("/api/admin/pending-accounts", { credentials: "include" });
-        const data = await response.json().catch(() => ({}));
+        const [pendingResponse, usersResponse] = await Promise.all([
+          fetch("/api/admin/pending-accounts", { credentials: "include" }),
+          fetch("/api/admin/users", { credentials: "include" }),
+        ]);
+        const pendingData = await pendingResponse.json().catch(() => ({}));
+        const usersData = await usersResponse.json().catch(() => ({}));
 
         if (!active) return;
 
-        if (data.configured === false) {
+        if (pendingData.configured === false) {
           setPendingAccounts(getPendingAccounts());
-        } else if (response.ok) {
-          setPendingAccounts(data.accounts ?? []);
+          setUserDirectory(getAdminUserDirectory());
+        } else if (pendingResponse.ok && usersResponse.ok) {
+          setPendingAccounts(pendingData.accounts ?? []);
+          setUserDirectory(usersData.accounts ?? []);
         } else {
-          toast.error(data.error || "Could not load pending accounts.");
+          toast.error(pendingData.error || usersData.error || "Could not load admin accounts.");
         }
       } catch {
-        if (active) setPendingAccounts(getPendingAccounts());
+        if (active) {
+          setPendingAccounts(getPendingAccounts());
+          setUserDirectory(getAdminUserDirectory());
+        }
       } finally {
         if (active) setApprovalQueueLoading(false);
       }
@@ -166,6 +179,40 @@ function Admin() {
         </section>
       ) : null}
 
+      {allowed ? (
+        <section className="px-5 mt-5">
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[14px] font-bold text-navy">Data sharing preferences</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  Shows whether reporters want anonymity and whether admins can contact them.
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-[11px] font-bold text-muted-foreground">
+                  <EyeOff className="h-3.5 w-3.5" />
+                  {anonymousCount}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-teal/10 px-2.5 py-1 text-[11px] font-bold text-teal">
+                  <PhoneCall className="h-3.5 w-3.5" />
+                  {followUpCount}
+                </span>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              {userDirectory.length ? (
+                userDirectory.slice(0, 6).map((account) => <ConsentAccount key={account.email} account={account} />)
+              ) : (
+                <p className="rounded-xl bg-surface p-3 text-[12px] font-semibold text-muted-foreground">
+                  No user records loaded yet.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="px-5 mt-5">
         <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
           <p className="text-[14px] font-bold text-navy">Next database-backed views</p>
@@ -205,10 +252,42 @@ function PendingAccount({ account, onApprove }: { account: AccountRecord; onAppr
         <p><span className="font-bold text-navy">ZIP:</span> {account.postalCode}</p>
         <p className="col-span-2"><span className="font-bold text-navy">Org:</span> {account.organization || account.householdMemberId}</p>
         <p className="col-span-2"><span className="font-bold text-navy">Location:</span> {account.physicalLocation}</p>
+        <p className="col-span-2">
+          <span className="font-bold text-navy">Sharing:</span> {account.shareDataAnonymously ? "Anonymous" : "Identified"} · {account.openToFollowUp ? "follow-up allowed" : "no follow-up"}
+        </p>
       </div>
       {account.approvalNote ? (
         <p className="mt-2 rounded-lg bg-card p-2 text-[11px] leading-relaxed text-navy">{account.approvalNote}</p>
       ) : null}
+    </div>
+  );
+}
+
+function ConsentAccount({ account }: { account: AccountRecord }) {
+  const displayName = account.shareDataAnonymously ? "Anonymous reporter" : account.name;
+  const canContact = account.openToFollowUp;
+
+  return (
+    <div className="rounded-xl border border-border bg-surface p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-bold text-navy">{displayName}</p>
+          <p className="mt-0.5 text-[11px] font-semibold text-teal capitalize">
+            {account.reviewLane ? `${account.reviewLane} ` : ""}{account.role}
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {canContact ? `${account.email}${account.phoneNumber ? ` · ${account.phoneNumber}` : ""}` : account.shareDataAnonymously ? "Identity hidden" : account.email}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${account.shareDataAnonymously ? "bg-surface text-muted-foreground" : "bg-teal/10 text-teal"}`}>
+            {account.shareDataAnonymously ? "Anonymous" : "Identified"}
+          </span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${canContact ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
+            {canContact ? "Follow-up OK" : "No follow-up"}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

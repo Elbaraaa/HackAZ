@@ -27,6 +27,8 @@ type ProfileForm = {
   physicalLocation: string;
   locationType: LocationType;
   organization: string;
+  shareDataAnonymously: boolean;
+  openToFollowUp: boolean;
 };
 
 const SEX_OPTIONS: Sex[] = ["prefer-not-to-say", "female", "male", "intersex", "other"];
@@ -55,6 +57,8 @@ function Profile() {
         physicalLocation: form.physicalLocation,
         locationType: form.locationType,
         organization: form.organization,
+        shareDataAnonymously: form.shareDataAnonymously,
+        openToFollowUp: form.openToFollowUp,
       });
       toast.success("Profile updated");
     } catch (error) {
@@ -103,6 +107,23 @@ function Profile() {
         <Field label="Physical location" value={form.physicalLocation} onChange={(physicalLocation) => setForm((f) => ({ ...f, physicalLocation }))} />
         <SelectField label="Location type" value={form.locationType} options={LOCATION_OPTIONS} onChange={(locationType) => setForm((f) => ({ ...f, locationType: locationType as LocationType }))} />
         <Field label="Organization" value={form.organization} onChange={(organization) => setForm((f) => ({ ...f, organization }))} />
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <p className="text-[13px] font-extrabold text-navy">Data sharing</p>
+          <div className="mt-3 space-y-3">
+            <CheckboxField
+              label="Share my reports anonymously"
+              description="Admins can still use the signal, but your name is hidden unless follow-up contact is allowed."
+              checked={form.shareDataAnonymously}
+              onChange={(shareDataAnonymously) => setForm((f) => ({ ...f, shareDataAnonymously }))}
+            />
+            <CheckboxField
+              label="Open to follow-up contact"
+              description="Admins can see your email or phone number when a case needs a follow-up."
+              checked={form.openToFollowUp}
+              onChange={(openToFollowUp) => setForm((f) => ({ ...f, openToFollowUp }))}
+            />
+          </div>
+        </section>
       </section>
 
       <section className="px-5 mt-6">
@@ -132,7 +153,36 @@ function profileToForm(profile: AppUserProfile | null): ProfileForm {
     physicalLocation: profile?.physicalLocation ?? "",
     locationType: profile?.locationType ?? "home",
     organization: profile?.organization ?? "",
+    shareDataAnonymously: profile?.shareDataAnonymously ?? true,
+    openToFollowUp: profile?.openToFollowUp ?? false,
   };
+}
+
+function CheckboxField({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex gap-3 rounded-xl bg-surface p-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-0.5 h-4 w-4 rounded border-border accent-teal"
+      />
+      <span>
+        <span className="block text-[13px] font-bold text-navy">{label}</span>
+        <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">{description}</span>
+      </span>
+    </label>
+  );
 }
 
 function Field({

@@ -1,0 +1,141 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "bloomy",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.YesIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NoIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "DebugIntent",
+          "slots": [],
+          "samples": [
+            "test gemma",
+            "test the connection",
+            "debug bloomy",
+            "check the backend"
+          ]
+        },
+        {
+          "name": "CheckInIntent",
+          "slots": [
+            {
+              "name": "report",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "check in {report}",
+            "report {report}",
+            "save a check in that says {report}",
+            "log that {report}",
+            "tell bloomy {report}"
+          ]
+        },
+        {
+          "name": "FeelingIntent",
+          "slots": [
+            {
+              "name": "feeling",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I feel {feeling}",
+            "I'm feeling {feeling}",
+            "today I feel {feeling}"
+          ]
+        },
+        {
+          "name": "SymptomsIntent",
+          "slots": [
+            {
+              "name": "symptoms",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I have {symptoms}",
+            "my symptoms are {symptoms}",
+            "symptoms are {symptoms}",
+            "I am having {symptoms}"
+          ]
+        },
+        {
+          "name": "DurationIntent",
+          "slots": [
+            {
+              "name": "duration",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "for {duration}",
+            "it has been {duration}",
+            "about {duration}"
+          ]
+        },
+        {
+          "name": "FeverIntent",
+          "slots": [
+            {
+              "name": "fever",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "fever is {fever}",
+            "my fever is {fever}",
+            "temperature is {fever}"
+          ]
+        },
+        {
+          "name": "ImpactIntent",
+          "slots": [
+            {
+              "name": "impact",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I missed {impact}",
+            "I was absent from {impact}",
+            "it affected {impact}"
+          ]
+        },
+        {
+          "name": "SocialGatheringIntent",
+          "slots": [
+            {
+              "name": "gathering",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I was around {gathering}",
+            "I attended {gathering}",
+            "I was at {gathering}"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}

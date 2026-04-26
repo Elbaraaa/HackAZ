@@ -30,6 +30,7 @@ import { Route as ApiAuthSignupRouteImport } from './routes/api/auth.signup'
 import { Route as ApiAuthSessionRouteImport } from './routes/api/auth.session'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth.logout'
 import { Route as ApiAuthLoginRouteImport } from './routes/api/auth.login'
+import { Route as ApiAdminUsersRouteImport } from './routes/api/admin.users'
 import { Route as ApiAdminPendingAccountsRouteImport } from './routes/api/admin.pending-accounts'
 import { Route as ApiAdminApproveAccountRouteImport } from './routes/api/admin.approve-account'
 
@@ -138,6 +139,11 @@ const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
   path: '/api/auth/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminUsersRoute = ApiAdminUsersRouteImport.update({
+  id: '/api/admin/users',
+  path: '/api/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminPendingAccountsRoute = ApiAdminPendingAccountsRouteImport.update({
   id: '/api/admin/pending-accounts',
   path: '/api/admin/pending-accounts',
@@ -165,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/api/profile': typeof ApiProfileRoute
   '/api/admin/approve-account': typeof ApiAdminApproveAccountRoute
   '/api/admin/pending-accounts': typeof ApiAdminPendingAccountsRoute
+  '/api/admin/users': typeof ApiAdminUsersRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/session': typeof ApiAuthSessionRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByTo {
   '/api/profile': typeof ApiProfileRoute
   '/api/admin/approve-account': typeof ApiAdminApproveAccountRoute
   '/api/admin/pending-accounts': typeof ApiAdminPendingAccountsRoute
+  '/api/admin/users': typeof ApiAdminUsersRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/session': typeof ApiAuthSessionRoute
@@ -216,6 +224,7 @@ export interface FileRoutesById {
   '/api/profile': typeof ApiProfileRoute
   '/api/admin/approve-account': typeof ApiAdminApproveAccountRoute
   '/api/admin/pending-accounts': typeof ApiAdminPendingAccountsRoute
+  '/api/admin/users': typeof ApiAdminUsersRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/session': typeof ApiAuthSessionRoute
@@ -243,6 +252,7 @@ export interface FileRouteTypes {
     | '/api/profile'
     | '/api/admin/approve-account'
     | '/api/admin/pending-accounts'
+    | '/api/admin/users'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/session'
@@ -268,6 +278,7 @@ export interface FileRouteTypes {
     | '/api/profile'
     | '/api/admin/approve-account'
     | '/api/admin/pending-accounts'
+    | '/api/admin/users'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/session'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/api/profile'
     | '/api/admin/approve-account'
     | '/api/admin/pending-accounts'
+    | '/api/admin/users'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/session'
@@ -319,6 +331,7 @@ export interface RootRouteChildren {
   ApiProfileRoute: typeof ApiProfileRoute
   ApiAdminApproveAccountRoute: typeof ApiAdminApproveAccountRoute
   ApiAdminPendingAccountsRoute: typeof ApiAdminPendingAccountsRoute
+  ApiAdminUsersRoute: typeof ApiAdminUsersRoute
   ApiAuthLoginRoute: typeof ApiAuthLoginRoute
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthSessionRoute: typeof ApiAuthSessionRoute
@@ -478,6 +491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/users': {
+      id: '/api/admin/users'
+      path: '/api/admin/users'
+      fullPath: '/api/admin/users'
+      preLoaderRoute: typeof ApiAdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/pending-accounts': {
       id: '/api/admin/pending-accounts'
       path: '/api/admin/pending-accounts'
@@ -511,6 +531,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfileRoute: ApiProfileRoute,
   ApiAdminApproveAccountRoute: ApiAdminApproveAccountRoute,
   ApiAdminPendingAccountsRoute: ApiAdminPendingAccountsRoute,
+  ApiAdminUsersRoute: ApiAdminUsersRoute,
   ApiAuthLoginRoute: ApiAuthLoginRoute,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthSessionRoute: ApiAuthSessionRoute,

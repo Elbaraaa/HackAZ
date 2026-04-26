@@ -24,6 +24,8 @@ export type SignupProfileInput = {
   organization?: string;
   approvalNote?: string;
   reviewLane?: ReviewLane;
+  shareDataAnonymously?: boolean;
+  openToFollowUp?: boolean;
 };
 
 export type AccountRecord = Omit<SignupProfileInput, "password" | "dateOfReport"> & {
@@ -60,6 +62,8 @@ export type AppUserProfile = {
   approvalNote?: string;
   approvalStatus?: AccountStatus;
   reviewLane?: ReviewLane;
+  shareDataAnonymously?: boolean;
+  openToFollowUp?: boolean;
 };
 
 export type DoctorProfile = {
@@ -158,6 +162,8 @@ function seedAccounts(state: AppDataState) {
       physicalLocation: "Tucson, AZ",
       locationType: "home",
       organization: "",
+      shareDataAnonymously: true,
+      openToFollowUp: false,
     },
     {
       role: "doctor",
@@ -176,6 +182,8 @@ function seedAccounts(state: AppDataState) {
       locationType: "clinic",
       organization: "Bloomy Review Clinic",
       reviewLane: "clinical",
+      shareDataAnonymously: false,
+      openToFollowUp: true,
     },
     {
       role: "doctor",
@@ -194,6 +202,8 @@ function seedAccounts(state: AppDataState) {
       locationType: "clinic",
       organization: "Bloomy Veterinary Network",
       reviewLane: "veterinary",
+      shareDataAnonymously: false,
+      openToFollowUp: true,
     },
     {
       role: "environmental",
@@ -211,6 +221,8 @@ function seedAccounts(state: AppDataState) {
       physicalLocation: "Pima County Environmental Health",
       locationType: "workplace",
       organization: "Pima County Environmental Health",
+      shareDataAnonymously: false,
+      openToFollowUp: true,
     },
     {
       role: "admin",
@@ -228,6 +240,8 @@ function seedAccounts(state: AppDataState) {
       physicalLocation: "Pima County Operations Center",
       locationType: "workplace",
       organization: "Bloomy",
+      shareDataAnonymously: false,
+      openToFollowUp: true,
     },
   ];
 
@@ -242,6 +256,11 @@ function seedAccounts(state: AppDataState) {
           approvedBy: state.accounts[key].approvedBy ?? "system",
         };
       }
+      state.accounts[key] = {
+        ...state.accounts[key],
+        shareDataAnonymously: state.accounts[key].shareDataAnonymously ?? account.shareDataAnonymously ?? true,
+        openToFollowUp: state.accounts[key].openToFollowUp ?? account.openToFollowUp ?? false,
+      };
       return;
     }
 
@@ -287,6 +306,8 @@ function profileFromAccount(account: AccountRecord, existing?: AppUserProfile): 
     approvalNote: account.approvalNote,
     approvalStatus: account.status,
     reviewLane: account.reviewLane,
+    shareDataAnonymously: account.shareDataAnonymously ?? true,
+    openToFollowUp: account.openToFollowUp ?? false,
   };
 }
 
@@ -389,6 +410,8 @@ export function createLocalAccount(input: SignupProfileInput): AppUserProfile {
     organization: input.organization?.trim(),
     approvalNote: input.approvalNote?.trim(),
     reviewLane: input.reviewLane ?? defaultReviewLane(input),
+    shareDataAnonymously: input.shareDataAnonymously ?? true,
+    openToFollowUp: input.openToFollowUp ?? false,
     uniqueId: input.uniqueId.trim(),
     occupation: input.occupation.trim(),
     name: input.name.trim(),
@@ -472,6 +495,8 @@ export function upsertLocalUserProfile(user: {
     approvalNote: account?.approvalNote ?? existing?.approvalNote,
     approvalStatus: account?.status ?? existing?.approvalStatus,
     reviewLane: account?.reviewLane ?? existing?.reviewLane,
+    shareDataAnonymously: account?.shareDataAnonymously ?? existing?.shareDataAnonymously ?? true,
+    openToFollowUp: account?.openToFollowUp ?? existing?.openToFollowUp ?? false,
   };
 
   const profile = ensureRoleProfile(state, next);
@@ -483,7 +508,8 @@ export function updateLocalUserProfile(
   userId: string,
   input: Partial<Pick<AppUserProfile,
     "name" | "age" | "sex" | "occupation" | "postalCode" | "phoneNumber" |
-    "householdMemberId" | "physicalLocation" | "locationType" | "organization"
+    "householdMemberId" | "physicalLocation" | "locationType" | "organization" |
+    "shareDataAnonymously" | "openToFollowUp"
   >>,
 ): AppUserProfile {
   const state = seedAccounts(readState());
@@ -502,6 +528,8 @@ export function updateLocalUserProfile(
     householdMemberId: input.householdMemberId?.trim() || current.householdMemberId,
     physicalLocation: input.physicalLocation?.trim() || current.physicalLocation,
     organization: input.organization?.trim() ?? current.organization,
+    shareDataAnonymously: input.shareDataAnonymously ?? current.shareDataAnonymously ?? true,
+    openToFollowUp: input.openToFollowUp ?? current.openToFollowUp ?? false,
   };
 
   state.users[userId] = next;
@@ -520,6 +548,8 @@ export function updateLocalUserProfile(
       locationType: next.locationType ?? account.locationType,
       organization: next.organization ?? account.organization,
       reviewLane: next.reviewLane ?? account.reviewLane,
+      shareDataAnonymously: next.shareDataAnonymously ?? account.shareDataAnonymously ?? true,
+      openToFollowUp: next.openToFollowUp ?? account.openToFollowUp ?? false,
     };
   }
 
@@ -551,6 +581,12 @@ export function getPendingAccounts() {
   return Object.values(state.accounts)
     .filter((account) => account.status === "pending")
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+}
+
+export function getAdminUserDirectory() {
+  const state = seedAccounts(readState());
+  writeState(state);
+  return Object.values(state.accounts).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
 export function approveAccount(email: string, approvedBy = "admin") {

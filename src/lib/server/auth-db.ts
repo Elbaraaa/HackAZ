@@ -42,6 +42,8 @@ export async function ensureAuthSchema() {
       organization TEXT,
       approval_note TEXT,
       review_lane TEXT,
+      share_data_anonymously BOOLEAN NOT NULL DEFAULT TRUE,
+      open_to_follow_up BOOLEAN NOT NULL DEFAULT FALSE,
       workspace_id TEXT NOT NULL,
       doctor_profile_id TEXT,
       patient_profile_id TEXT,
@@ -52,6 +54,8 @@ export async function ensureAuthSchema() {
     )
   `;
   await sql`ALTER TABLE bloomy_users ADD COLUMN IF NOT EXISTS review_lane TEXT`;
+  await sql`ALTER TABLE bloomy_users ADD COLUMN IF NOT EXISTS share_data_anonymously BOOLEAN NOT NULL DEFAULT TRUE`;
+  await sql`ALTER TABLE bloomy_users ADD COLUMN IF NOT EXISTS open_to_follow_up BOOLEAN NOT NULL DEFAULT FALSE`;
   await sql`
     CREATE TABLE IF NOT EXISTS bloomy_sessions (
       id TEXT PRIMARY KEY,
@@ -101,6 +105,8 @@ async function seedSystemAccounts(sql: SqlClient) {
       physicalLocation: "Tucson, AZ",
       locationType: "home",
       organization: "",
+      shareDataAnonymously: true,
+      openToFollowUp: false,
     },
     {
       role: "doctor",
@@ -119,6 +125,8 @@ async function seedSystemAccounts(sql: SqlClient) {
       locationType: "clinic",
       organization: "Bloomy Review Clinic",
       reviewLane: "clinical",
+      shareDataAnonymously: false,
+      openToFollowUp: true,
     },
     {
       role: "doctor",
@@ -137,6 +145,8 @@ async function seedSystemAccounts(sql: SqlClient) {
       locationType: "clinic",
       organization: "Bloomy Veterinary Network",
       reviewLane: "veterinary",
+      shareDataAnonymously: false,
+      openToFollowUp: true,
     },
     {
       role: "environmental",
@@ -154,6 +164,8 @@ async function seedSystemAccounts(sql: SqlClient) {
       physicalLocation: "Pima County Environmental Health",
       locationType: "workplace",
       organization: "Pima County Environmental Health",
+      shareDataAnonymously: false,
+      openToFollowUp: true,
     },
     {
       role: "admin",
@@ -171,6 +183,8 @@ async function seedSystemAccounts(sql: SqlClient) {
       physicalLocation: "Pima County Operations Center",
       locationType: "workplace",
       organization: "Bloomy",
+      shareDataAnonymously: false,
+      openToFollowUp: true,
     },
   ];
 
@@ -206,16 +220,17 @@ async function insertUser(sql: SqlClient, input: SignupProfileInput, options?: {
       INSERT INTO bloomy_users (
         id, email, password_hash, name, role, status, age, sex, unique_id, occupation,
         date_of_report, postal_code, phone_number, household_member_id, physical_location,
-        location_type, organization, approval_note, review_lane, workspace_id, doctor_profile_id,
-        patient_profile_id, approved_at, approved_by, created_at
+        location_type, organization, approval_note, review_lane, share_data_anonymously,
+        open_to_follow_up, workspace_id, doctor_profile_id, patient_profile_id, approved_at,
+        approved_by, created_at
       ) VALUES (
         ${id}, ${normalizeEmail(input.email)}, ${passwordHash}, ${input.name.trim()}, ${input.role},
         ${status}, ${input.age || null}, ${input.sex}, ${input.uniqueId.trim()}, ${input.occupation.trim()},
         ${input.dateOfReport}, ${input.postalCode.trim()}, ${input.phoneNumber.trim()},
         ${input.householdMemberId.trim()}, ${input.physicalLocation.trim()}, ${input.locationType},
         ${input.organization?.trim() || null}, ${input.approvalNote?.trim() || null},
-        ${input.reviewLane ?? defaultReviewLane(input)}, ${workspaceId},
-        ${doctorProfileId}, ${patientProfileId}, ${status === "approved" ? now : null},
+        ${input.reviewLane ?? defaultReviewLane(input)}, ${input.shareDataAnonymously ?? true},
+        ${input.openToFollowUp ?? false}, ${workspaceId}, ${doctorProfileId}, ${patientProfileId}, ${status === "approved" ? now : null},
         ${status === "approved" ? options?.approvedBy ?? "self-service" : null}, ${now}
       )
     `;
@@ -312,6 +327,16 @@ export async function listPendingAccounts() {
   return rows.map(rowToAccountRecord);
 }
 
+export async function listAdminUsers() {
+  await ensureAuthSchemaOnce();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT * FROM bloomy_users
+    ORDER BY created_at DESC
+  `;
+  return rows.map(rowToAccountRecord);
+}
+
 export async function approvePendingAccount(email: string, approvedBy: string) {
   await ensureAuthSchemaOnce();
   const sql = getSql();
@@ -333,7 +358,8 @@ export async function updateSessionProfile(
   request: Request,
   input: Partial<Pick<AppUserProfile,
     "name" | "age" | "sex" | "occupation" | "postalCode" | "phoneNumber" |
-    "householdMemberId" | "physicalLocation" | "locationType" | "organization"
+    "householdMemberId" | "physicalLocation" | "locationType" | "organization" |
+    "shareDataAnonymously" | "openToFollowUp"
   >>,
 ) {
   await ensureAuthSchemaOnce();
@@ -355,7 +381,9 @@ export async function updateSessionProfile(
       household_member_id = ${input.householdMemberId?.trim() || current.householdMemberId || ""},
       physical_location = ${input.physicalLocation?.trim() || current.physicalLocation || ""},
       location_type = ${input.locationType ?? current.locationType ?? "home"},
-      organization = ${input.organization?.trim() || current.organization || null}
+      organization = ${input.organization?.trim() || current.organization || null},
+      share_data_anonymously = ${input.shareDataAnonymously ?? current.shareDataAnonymously ?? true},
+      open_to_follow_up = ${input.openToFollowUp ?? current.openToFollowUp ?? false}
     WHERE id = ${current.id}
   `;
 
@@ -444,6 +472,8 @@ function rowToProfile(row: any): AppUserProfile {
     approvalNote: row.approval_note ?? undefined,
     approvalStatus: row.status,
     reviewLane: row.review_lane ?? undefined,
+    shareDataAnonymously: row.share_data_anonymously ?? true,
+    openToFollowUp: row.open_to_follow_up ?? false,
   };
 }
 
@@ -467,6 +497,8 @@ function rowToAccountRecord(row: any): AccountRecord {
     organization: row.organization ?? undefined,
     approvalNote: row.approval_note ?? undefined,
     reviewLane: row.review_lane ?? undefined,
+    shareDataAnonymously: row.share_data_anonymously ?? true,
+    openToFollowUp: row.open_to_follow_up ?? false,
     workspaceId: row.workspace_id,
     status: row.status,
     approvedAt: row.approved_at ?? undefined,

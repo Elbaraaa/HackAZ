@@ -159,6 +159,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
         locationType: String(form.get("locationType") ?? (reviewerSignup ? "workplace" : "home")) as LocationType,
         organization: String(form.get("organization") ?? ""),
         approvalNote: String(form.get("approvalNote") ?? ""),
+        shareDataAnonymously: form.get("shareDataAnonymously") === "on",
+        openToFollowUp: form.get("openToFollowUp") === "on",
       });
       if (profile.approvalStatus === "pending") {
         setNotice("Request submitted. An admin must approve this account before it can log in.");
@@ -323,6 +325,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 </div>
                   </>
                 )}
+                <ConsentFields reviewer={selectedWorkspace.role === "doctor" || selectedWorkspace.role === "environmental"} />
 
                 <button className="flex w-full items-center justify-center gap-2 rounded-2xl bg-navy py-4 text-[13px] font-extrabold text-white shadow-elevated">
                   {selectedWorkspace.role === "doctor" || selectedWorkspace.role === "environmental" ? "Request approval" : "Create account"}
@@ -334,6 +337,44 @@ export function AuthGate({ children }: { children: ReactNode }) {
         )}
       </div>
     </main>
+  );
+}
+
+function ConsentFields({ reviewer }: { reviewer: boolean }) {
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-3">
+      <p className="text-[12px] font-bold text-navy">Data sharing</p>
+      <div className="mt-3 space-y-2">
+        <label className="flex gap-3 rounded-xl bg-card p-3">
+          <input
+            name="shareDataAnonymously"
+            type="checkbox"
+            defaultChecked={!reviewer}
+            className="mt-0.5 h-4 w-4 rounded border-border accent-teal"
+          />
+          <span>
+            <span className="block text-[12px] font-bold text-navy">Share reports anonymously</span>
+            <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">
+              Admins can still use the signal, but your identity is hidden unless follow-up contact is allowed.
+            </span>
+          </span>
+        </label>
+        <label className="flex gap-3 rounded-xl bg-card p-3">
+          <input
+            name="openToFollowUp"
+            type="checkbox"
+            defaultChecked={reviewer}
+            className="mt-0.5 h-4 w-4 rounded border-border accent-teal"
+          />
+          <span>
+            <span className="block text-[12px] font-bold text-navy">Open to follow-up contact</span>
+            <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">
+              Admins can see contact details if they need to follow up on the case.
+            </span>
+          </span>
+        </label>
+      </div>
+    </div>
   );
 }
 
