@@ -43,6 +43,16 @@ function writeSession(session: LocalSession | null) {
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
+function cacheSession(session: LocalSession | null) {
+  if (typeof window === "undefined") return;
+
+  if (session) {
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  } else {
+    window.localStorage.removeItem(SESSION_KEY);
+  }
+}
+
 function sessionFromProfile(profile: AppUserProfile): LocalSession {
   return {
     id: profile.id,
@@ -80,6 +90,7 @@ export function useAppUser() {
 
         if (data.configured) {
           const nextProfile = data.profile as AppUserProfile | null;
+          cacheSession(nextProfile ? sessionFromProfile(nextProfile) : null);
           setProfile(nextProfile);
           setSession(nextProfile ? sessionFromProfile(nextProfile) : null);
           setIsLoading(false);
@@ -130,6 +141,7 @@ export function useAppUser() {
       }
 
       const next = data.profile as AppUserProfile;
+      writeSession(sessionFromProfile(next));
       setProfile(next);
       setSession(sessionFromProfile(next));
       return next;
@@ -165,6 +177,7 @@ export function useAppUser() {
 
       const next = data.profile as AppUserProfile;
       if (next.approvalStatus === "approved") {
+        writeSession(sessionFromProfile(next));
         setSession(sessionFromProfile(next));
         setProfile(next);
       }

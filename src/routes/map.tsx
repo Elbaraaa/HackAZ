@@ -5,7 +5,6 @@ import { activeSignals, type CommunitySignal, useStore } from "@/lib/store";
 import { formatRelativeTime } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Bug, Droplets, Flame, Heart, Hospital } from "lucide-react";
-import { useAppUser } from "@/hooks/use-app-user";
 
 export const Route = createFileRoute("/map")({
   head: () => ({
@@ -29,15 +28,10 @@ const FILTERS = [
 const TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefined;
 
 function MapView() {
-  const { role, profile } = useAppUser();
   const signals = useStore((s) => s.signals);
   const liveSignals = useMemo(() => {
-    const live = activeSignals(signals);
-    if ((role === "doctor" || role === "environmental") && profile) {
-      return live.filter((signal) => signal.reviewerWorkspaceId === profile.workspaceId);
-    }
-    return live;
-  }, [profile, role, signals]);
+    return activeSignals(signals);
+  }, [signals]);
   const [filters, setFilters] = useState<Array<Exclude<typeof FILTERS[number]["id"], "all">>>([]);
   const filtered = useMemo(
     () => filters.length === 0 ? liveSignals : liveSignals.filter((s) => filters.includes(s.type as Exclude<typeof FILTERS[number]["id"], "all">)),
@@ -109,7 +103,7 @@ function MapView() {
               <div>
                 <p className="text-[15px] font-extrabold text-navy">Live Regional Intelligence</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {role === "doctor" || role === "environmental" ? "Showing your assigned review geography only." : "Regions are mile-radius outbreak ranges. Zoom in for 3D."}
+                  Regions are mile-radius outbreak ranges across all Bloomy signal types. Zoom in for 3D.
                 </p>
               </div>
               <span className="shrink-0 rounded-full bg-danger/10 px-2.5 py-1 text-[11px] font-bold text-danger">{filtered.length} live</span>
