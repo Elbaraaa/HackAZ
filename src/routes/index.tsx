@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
-import { AccountPanel } from "@/components/AccountPanel";
-import { Activity, AlertTriangle, ArrowRight, Bug, ChevronRight, Droplets, Heart, MapPin, Microscope, ShieldCheck, Sparkles, Stethoscope, Users } from "lucide-react";
+import { AuthStatus } from "@/components/AuthStatus";
+import { Activity, AlertTriangle, Bug, ChevronRight, Heart, MapPin, ShieldCheck, Sparkles, Stethoscope, UserRound, Users } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
@@ -25,9 +25,12 @@ function Index() {
   return (
     <AppShell>
       <TopBar title="OutbreakIQ" pill={<StatusPill tone="live">AI Surveillance Active</StatusPill>} right={
-        <Link to="/insights" className="w-9 h-9 rounded-full bg-gradient-teal grid place-items-center text-teal-foreground shadow-glow">
-          <Sparkles className="w-4 h-4" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <AuthStatus />
+          <Link to="/insights" className="w-9 h-9 rounded-full bg-gradient-teal grid place-items-center text-teal-foreground shadow-glow">
+            <Sparkles className="w-4 h-4" />
+          </Link>
+        </div>
       }/>
 
       <section className="px-5 pt-4 pb-6">
@@ -51,8 +54,6 @@ function Index() {
           </Link>
         </div>
       </section>
-
-      <AccountPanel />
 
       {/* Map preview card */}
       <section className="px-5">
@@ -97,23 +98,26 @@ function Index() {
         <ValueCard icon={<Users className="w-5 h-5" />} title="Help detect outbreaks earlier" body="Your anonymous signals empower public health officials to deploy resources faster and contain threats before they spread." />
       </section>
 
-      {/* Roles */}
-      <section className="px-5 mt-6 grid grid-cols-3 gap-3">
-        <Link to="/doctor" className="rounded-2xl bg-gradient-hero p-4 text-white shadow-elevated">
-          <Stethoscope className="w-5 h-5" />
-          <p className="mt-2 text-sm font-bold">Doctor view</p>
-          <p className="text-[11px] text-white/75 mt-0.5">Validate alerts in one tap</p>
-        </Link>
-        <Link to="/public-health" className="rounded-2xl bg-card border border-border p-4 text-navy shadow-soft">
-          <Microscope className="w-5 h-5 text-teal" />
-          <p className="mt-2 text-sm font-bold">Public health</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Explainable risk scores</p>
-        </Link>
-        <Link to="/admin" className="rounded-2xl bg-card border border-border p-4 text-navy shadow-soft">
-          <Users className="w-5 h-5 text-teal" />
-          <p className="mt-2 text-sm font-bold">Admin</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">User + analytics controls</p>
-        </Link>
+      {/* User types */}
+      <section className="px-5 mt-6">
+        <p className="text-[15px] font-bold text-navy">Choose your role</p>
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          <Link to="/checkin" className="rounded-2xl bg-gradient-hero p-4 text-white shadow-elevated">
+            <UserRound className="w-5 h-5" />
+            <p className="mt-2 text-sm font-bold">Patient</p>
+            <p className="text-[11px] text-white/75 mt-0.5">Check in and view insights</p>
+          </Link>
+          <Link to="/doctor" className="rounded-2xl bg-card border border-border p-4 text-navy shadow-soft">
+            <Stethoscope className="w-5 h-5 text-teal" />
+            <p className="mt-2 text-sm font-bold">Doctor</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Access clinical review</p>
+          </Link>
+          <Link to="/admin" className="rounded-2xl bg-card border border-border p-4 text-navy shadow-soft">
+            <Users className="w-5 h-5 text-teal" />
+            <p className="mt-2 text-sm font-bold">Admin</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Analytics and user roles</p>
+          </Link>
+        </div>
       </section>
 
       <p className="px-5 mt-6 text-[10px] text-center text-muted-foreground">
