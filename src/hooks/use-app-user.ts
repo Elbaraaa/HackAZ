@@ -5,6 +5,7 @@ import {
   type AppRole,
   type AppUserProfile,
   type SignupProfileInput,
+  updateLocalUserProfile,
   upsertLocalUserProfile,
 } from "@/lib/app-data";
 
@@ -182,6 +183,47 @@ export function useAppUser() {
     return next;
   }, []);
 
+  const updateProfile = useCallback(async (input: Partial<AppUserProfile>) => {
+    if (!session) {
+      throw new Error("Please sign in before updating your profile.");
+    }
+
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (data.configured === false) {
+        throw new Error("LOCAL_FALLBACK");
+      }
+      if (!response.ok) {
+        throw new Error(data.error || "Could not update profile.");
+      }
+
+      const next = data.profile as AppUserProfile;
+      const nextSession = sessionFromProfile(next);
+      writeSession(nextSession);
+      setSession(nextSession);
+      setProfile(next);
+      return next;
+    } catch (error) {
+      if (error instanceof Error && error.message !== "LOCAL_FALLBACK") {
+        throw error;
+      }
+    }
+
+    const next = updateLocalUserProfile(session.id, input);
+    const nextSession = sessionFromProfile(next);
+    writeSession(nextSession);
+    setSession(nextSession);
+    setProfile(next);
+    return next;
+  }, [session]);
+
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => undefined);
     writeSession(null);
@@ -211,8 +253,9 @@ export function useAppUser() {
       loginWithCredentials,
       signup,
       logout,
+      updateProfile,
       getAccessTokenSilently,
     }),
-    [getAccessTokenSilently, isLoading, loginWithCredentials, logout, profile, session, signup],
+    [getAccessTokenSilently, isLoading, loginWithCredentials, logout, profile, session, signup, updateProfile],
   );
 }

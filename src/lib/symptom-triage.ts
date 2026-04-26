@@ -36,6 +36,23 @@ export function analyzeSymptoms(input: {
     };
   }
 
+  if (!input.symptoms.length && !input.otherSymptom?.trim()) {
+    return {
+      possibleMatch: "No symptom details yet",
+      urgencyLabel: "Low - add symptoms to refine",
+      urgencyScore: input.feeling === "unsure" ? 12 : 18,
+      level: "low",
+      tone: "ok",
+      summary: "Bloomy needs symptom details before estimating urgency. This is a placeholder, not a health conclusion.",
+      nextSteps: [
+        "Select any symptoms that apply",
+        "Describe anything unusual if none of the options fit",
+        "Seek medical help if you feel unsafe or symptoms are severe",
+      ],
+      redFlags: [],
+    };
+  }
+
   const risk = computeRisk(input);
   const symptoms = input.symptoms;
   const has = (symptom: Symptom) => symptoms.includes(symptom);

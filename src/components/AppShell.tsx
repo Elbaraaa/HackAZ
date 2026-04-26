@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Activity, Gift, Map as MapIcon, Stethoscope, Home, Shield } from "lucide-react";
+import { Activity, Gift, Map as MapIcon, Stethoscope, Home, Shield, UserRound } from "lucide-react";
 import { type ReactNode, useId } from "react";
 import { useAppUser } from "@/hooks/use-app-user";
 
@@ -10,6 +10,7 @@ const tabs = [
   { to: "/rewards", label: "Rewards", icon: Gift },
   { to: "/doctor", label: "Review", icon: Stethoscope },
   { to: "/admin", label: "Admin", icon: Shield },
+  { to: "/profile", label: "Profile", icon: UserRound },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -26,7 +27,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {children}
       </div>
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-card/95 backdrop-blur-xl border-t border-border z-50">
-        <div className={`grid px-2 py-2 ${visibleTabs.length === 5 ? "grid-cols-5" : "grid-cols-4"}`}>
+        <div className="grid px-2 py-2" style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}>
           {visibleTabs.map((t) => {
             const active = loc.pathname === t.to;
             const Icon = t.icon;

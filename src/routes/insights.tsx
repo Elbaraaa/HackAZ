@@ -4,6 +4,7 @@ import { useStore, computeRisk } from "@/lib/store";
 import { rewardAudience } from "@/lib/rewards";
 import { analyzeSymptoms, type SymptomTriage } from "@/lib/symptom-triage";
 import { ChevronRight, Cloud, Droplets, Flame, Gift, Heart, Hospital, Phone, ShieldCheck, Sparkles, Stethoscope, Thermometer } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type InsightsSearch = { id?: string };
 
@@ -53,6 +54,19 @@ function Insights() {
     zip: checkIn.zip,
     otherSymptom: checkIn.otherSymptom,
   });
+  const gemmaTriage = useGemmaTriage({
+    enabled: Boolean(checkIn.symptoms.length || checkIn.otherSymptom),
+    feeling: checkIn.feeling,
+    symptoms: checkIn.symptoms,
+    otherSymptom: checkIn.otherSymptom,
+    riskScore: r.score,
+    urgencyLabel: triage.urgencyLabel,
+    zip: checkIn.zip,
+    factors: r.factors,
+  });
+  const displayedTriage = gemmaTriage
+    ? { ...triage, summary: gemmaTriage.summary || triage.summary, nextSteps: gemmaTriage.nextSteps.length ? gemmaTriage.nextSteps : triage.nextSteps }
+    : triage;
 
   return (
     <AppShell>
@@ -78,7 +92,7 @@ function Insights() {
       </section>
 
       <section className="px-5 mt-5">
-        <DetailedTriagePanel triage={triage} />
+        <DetailedTriagePanel triage={displayedTriage} refinedByGemma={Boolean(gemmaTriage)} />
       </section>
 
       <section className="px-5 mt-5">
@@ -225,7 +239,49 @@ function ActionRow({ icon, title, body }: { icon: React.ReactNode; title: string
   );
 }
 
-function DetailedTriagePanel({ triage }: { triage: SymptomTriage }) {
+function useGemmaTriage(input: {
+  enabled: boolean;
+  feeling: string;
+  symptoms: string[];
+  otherSymptom?: string;
+  riskScore: number;
+  urgencyLabel: string;
+  zip: string;
+  factors: string[];
+}) {
+  const [triage, setTriage] = useState<{ summary: string; nextSteps: string[] } | null>(null);
+
+  useEffect(() => {
+    if (!input.enabled) {
+      setTriage(null);
+      return;
+    }
+
+    let active = true;
+    fetch("/api/gemma/triage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!active || !data?.summary) return;
+        setTriage({
+          summary: data.summary,
+          nextSteps: Array.isArray(data.nextSteps) ? data.nextSteps : [],
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [input.enabled, input.feeling, input.otherSymptom, input.riskScore, input.urgencyLabel, input.zip, input.symptoms.join("|"), input.factors.join("|")]);
+
+  return triage;
+}
+
+function DetailedTriagePanel({ triage, refinedByGemma = false }: { triage: SymptomTriage; refinedByGemma?: boolean }) {
   const toneClass =
     triage.tone === "danger" ? "border-danger/25 bg-danger/8" :
     triage.tone === "warn" ? "border-warning/30 bg-warning/10" :
@@ -242,7 +298,9 @@ function DetailedTriagePanel({ triage }: { triage: SymptomTriage }) {
           <Stethoscope className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Quick AI triage</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            {refinedByGemma ? "Gemma-refined triage" : "Quick triage"}
+          </p>
           <p className="mt-1 text-[15px] font-bold text-navy">{triage.possibleMatch}</p>
           <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{triage.summary}</p>
         </div>

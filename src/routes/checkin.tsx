@@ -40,8 +40,8 @@ const SYMPTOMS: { id: Symptom; label: string }[] = [
 function CheckIn() {
   const navigate = useNavigate();
   const { user } = useAppUser();
-  const [feeling, setFeeling] = useState<CheckIn["feeling"]>("symptoms");
-  const [symptoms, setSymptoms] = useState<Symptom[]>(["cough-congestion"]);
+  const [feeling, setFeeling] = useState<CheckIn["feeling"]>("healthy");
+  const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [otherSymptom, setOtherSymptom] = useState("");
   const [absentFromWork, setAbsentFromWork] = useState(false);
   const [absentFromSchool, setAbsentFromSchool] = useState(false);
@@ -50,7 +50,8 @@ function CheckIn() {
   const [setting, setSetting] = useState<CheckIn["setting"]>("workplace");
   const [approxLocation, setApproxLocation] = useState<ApproxLocation | undefined>();
   const [locating, setLocating] = useState(false);
-  const vitals = simulateVitals(feeling);
+  const hasSymptomDetails = symptoms.length > 0 || otherSymptom.trim().length > 0;
+  const vitals = simulateVitals(feeling === "symptoms" && !hasSymptomDetails ? "unsure" : feeling);
   const activeReward = rewardAudience(feeling === "symptoms" ? "symptom" : "healthy");
   const symptomTriage = analyzeSymptoms({
     feeling,
@@ -77,6 +78,11 @@ function CheckIn() {
   };
 
   const submit = () => {
+    if (feeling === "symptoms" && !hasSymptomDetails) {
+      toast.error("Select at least one symptom or describe what feels different.");
+      return;
+    }
+
     const r = computeRisk({ feeling, symptoms, vitals, zip });
     const ci: CheckIn = {
       id: `ci-${Date.now()}`,
@@ -183,7 +189,7 @@ function CheckIn() {
               <FollowUpToggle label="Did you seek health care or treatment?" checked={soughtCare} onChange={setSoughtCare} />
             </div>
           </div>
-          <SymptomTriageCard triage={symptomTriage} />
+          {hasSymptomDetails ? <SymptomTriageCard triage={symptomTriage} /> : null}
         </section>
       )}
 

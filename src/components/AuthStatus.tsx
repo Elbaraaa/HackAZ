@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { LogOut, Shield, UserRound } from "lucide-react";
 import { useAppUser } from "@/hooks/use-app-user";
 
@@ -19,9 +20,9 @@ export function AuthStatus() {
           {profile?.role ?? "patient"}
         </p>
       </div>
-      <span className="grid h-9 w-9 place-items-center rounded-full bg-teal/10 text-teal">
+      <Link to="/profile" className="grid h-9 w-9 place-items-center rounded-full bg-teal/10 text-teal" aria-label="Open profile">
         <UserRound className="h-4 w-4" />
-      </span>
+      </Link>
       <button
         onClick={() => logout()}
         className="grid h-9 w-9 place-items-center rounded-full bg-muted text-muted-foreground"

@@ -12,12 +12,17 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as ReportRouteImport } from './routes/report'
 import { Route as PublicHealthRouteImport } from './routes/public-health'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as DoctorRouteImport } from './routes/doctor'
 import { Route as CheckinRouteImport } from './routes/checkin'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiProfileRouteImport } from './routes/api/profile'
+import { Route as ApiCheckinsRouteImport } from './routes/api/checkins'
+import { Route as ApiAlexaRouteImport } from './routes/api/alexa'
+import { Route as ApiGemmaTriageRouteImport } from './routes/api/gemma.triage'
 import { Route as ApiGemmaSummarizeVoiceRouteImport } from './routes/api/gemma.summarize-voice'
 import { Route as ApiGemmaAnalyzeImageRouteImport } from './routes/api/gemma.analyze-image'
 import { Route as ApiBackboardSessionRouteImport } from './routes/api/backboard.session'
@@ -41,6 +46,11 @@ const ReportRoute = ReportRouteImport.update({
 const PublicHealthRoute = PublicHealthRouteImport.update({
   id: '/public-health',
   path: '/public-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MapRoute = MapRouteImport.update({
@@ -71,6 +81,26 @@ const AdminRoute = AdminRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfileRoute = ApiProfileRouteImport.update({
+  id: '/api/profile',
+  path: '/api/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCheckinsRoute = ApiCheckinsRouteImport.update({
+  id: '/api/checkins',
+  path: '/api/checkins',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlexaRoute = ApiAlexaRouteImport.update({
+  id: '/api/alexa',
+  path: '/api/alexa',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGemmaTriageRoute = ApiGemmaTriageRouteImport.update({
+  id: '/api/gemma/triage',
+  path: '/api/gemma/triage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGemmaSummarizeVoiceRoute = ApiGemmaSummarizeVoiceRouteImport.update({
@@ -126,9 +156,13 @@ export interface FileRoutesByFullPath {
   '/doctor': typeof DoctorRoute
   '/insights': typeof InsightsRoute
   '/map': typeof MapRoute
+  '/profile': typeof ProfileRoute
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/rewards': typeof RewardsRoute
+  '/api/alexa': typeof ApiAlexaRoute
+  '/api/checkins': typeof ApiCheckinsRoute
+  '/api/profile': typeof ApiProfileRoute
   '/api/admin/approve-account': typeof ApiAdminApproveAccountRoute
   '/api/admin/pending-accounts': typeof ApiAdminPendingAccountsRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
@@ -138,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/api/backboard/session': typeof ApiBackboardSessionRoute
   '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
   '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
+  '/api/gemma/triage': typeof ApiGemmaTriageRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -146,9 +181,13 @@ export interface FileRoutesByTo {
   '/doctor': typeof DoctorRoute
   '/insights': typeof InsightsRoute
   '/map': typeof MapRoute
+  '/profile': typeof ProfileRoute
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/rewards': typeof RewardsRoute
+  '/api/alexa': typeof ApiAlexaRoute
+  '/api/checkins': typeof ApiCheckinsRoute
+  '/api/profile': typeof ApiProfileRoute
   '/api/admin/approve-account': typeof ApiAdminApproveAccountRoute
   '/api/admin/pending-accounts': typeof ApiAdminPendingAccountsRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
@@ -158,6 +197,7 @@ export interface FileRoutesByTo {
   '/api/backboard/session': typeof ApiBackboardSessionRoute
   '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
   '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
+  '/api/gemma/triage': typeof ApiGemmaTriageRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -167,9 +207,13 @@ export interface FileRoutesById {
   '/doctor': typeof DoctorRoute
   '/insights': typeof InsightsRoute
   '/map': typeof MapRoute
+  '/profile': typeof ProfileRoute
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/rewards': typeof RewardsRoute
+  '/api/alexa': typeof ApiAlexaRoute
+  '/api/checkins': typeof ApiCheckinsRoute
+  '/api/profile': typeof ApiProfileRoute
   '/api/admin/approve-account': typeof ApiAdminApproveAccountRoute
   '/api/admin/pending-accounts': typeof ApiAdminPendingAccountsRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
@@ -179,6 +223,7 @@ export interface FileRoutesById {
   '/api/backboard/session': typeof ApiBackboardSessionRoute
   '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
   '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
+  '/api/gemma/triage': typeof ApiGemmaTriageRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -189,9 +234,13 @@ export interface FileRouteTypes {
     | '/doctor'
     | '/insights'
     | '/map'
+    | '/profile'
     | '/public-health'
     | '/report'
     | '/rewards'
+    | '/api/alexa'
+    | '/api/checkins'
+    | '/api/profile'
     | '/api/admin/approve-account'
     | '/api/admin/pending-accounts'
     | '/api/auth/login'
@@ -201,6 +250,7 @@ export interface FileRouteTypes {
     | '/api/backboard/session'
     | '/api/gemma/analyze-image'
     | '/api/gemma/summarize-voice'
+    | '/api/gemma/triage'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -209,9 +259,13 @@ export interface FileRouteTypes {
     | '/doctor'
     | '/insights'
     | '/map'
+    | '/profile'
     | '/public-health'
     | '/report'
     | '/rewards'
+    | '/api/alexa'
+    | '/api/checkins'
+    | '/api/profile'
     | '/api/admin/approve-account'
     | '/api/admin/pending-accounts'
     | '/api/auth/login'
@@ -221,6 +275,7 @@ export interface FileRouteTypes {
     | '/api/backboard/session'
     | '/api/gemma/analyze-image'
     | '/api/gemma/summarize-voice'
+    | '/api/gemma/triage'
   id:
     | '__root__'
     | '/'
@@ -229,9 +284,13 @@ export interface FileRouteTypes {
     | '/doctor'
     | '/insights'
     | '/map'
+    | '/profile'
     | '/public-health'
     | '/report'
     | '/rewards'
+    | '/api/alexa'
+    | '/api/checkins'
+    | '/api/profile'
     | '/api/admin/approve-account'
     | '/api/admin/pending-accounts'
     | '/api/auth/login'
@@ -241,6 +300,7 @@ export interface FileRouteTypes {
     | '/api/backboard/session'
     | '/api/gemma/analyze-image'
     | '/api/gemma/summarize-voice'
+    | '/api/gemma/triage'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -250,9 +310,13 @@ export interface RootRouteChildren {
   DoctorRoute: typeof DoctorRoute
   InsightsRoute: typeof InsightsRoute
   MapRoute: typeof MapRoute
+  ProfileRoute: typeof ProfileRoute
   PublicHealthRoute: typeof PublicHealthRoute
   ReportRoute: typeof ReportRoute
   RewardsRoute: typeof RewardsRoute
+  ApiAlexaRoute: typeof ApiAlexaRoute
+  ApiCheckinsRoute: typeof ApiCheckinsRoute
+  ApiProfileRoute: typeof ApiProfileRoute
   ApiAdminApproveAccountRoute: typeof ApiAdminApproveAccountRoute
   ApiAdminPendingAccountsRoute: typeof ApiAdminPendingAccountsRoute
   ApiAuthLoginRoute: typeof ApiAuthLoginRoute
@@ -262,6 +326,7 @@ export interface RootRouteChildren {
   ApiBackboardSessionRoute: typeof ApiBackboardSessionRoute
   ApiGemmaAnalyzeImageRoute: typeof ApiGemmaAnalyzeImageRoute
   ApiGemmaSummarizeVoiceRoute: typeof ApiGemmaSummarizeVoiceRoute
+  ApiGemmaTriageRoute: typeof ApiGemmaTriageRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -285,6 +350,13 @@ declare module '@tanstack/react-router' {
       path: '/public-health'
       fullPath: '/public-health'
       preLoaderRoute: typeof PublicHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/map': {
@@ -327,6 +399,34 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profile': {
+      id: '/api/profile'
+      path: '/api/profile'
+      fullPath: '/api/profile'
+      preLoaderRoute: typeof ApiProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/checkins': {
+      id: '/api/checkins'
+      path: '/api/checkins'
+      fullPath: '/api/checkins'
+      preLoaderRoute: typeof ApiCheckinsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/alexa': {
+      id: '/api/alexa'
+      path: '/api/alexa'
+      fullPath: '/api/alexa'
+      preLoaderRoute: typeof ApiAlexaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gemma/triage': {
+      id: '/api/gemma/triage'
+      path: '/api/gemma/triage'
+      fullPath: '/api/gemma/triage'
+      preLoaderRoute: typeof ApiGemmaTriageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/gemma/summarize-voice': {
@@ -402,9 +502,13 @@ const rootRouteChildren: RootRouteChildren = {
   DoctorRoute: DoctorRoute,
   InsightsRoute: InsightsRoute,
   MapRoute: MapRoute,
+  ProfileRoute: ProfileRoute,
   PublicHealthRoute: PublicHealthRoute,
   ReportRoute: ReportRoute,
   RewardsRoute: RewardsRoute,
+  ApiAlexaRoute: ApiAlexaRoute,
+  ApiCheckinsRoute: ApiCheckinsRoute,
+  ApiProfileRoute: ApiProfileRoute,
   ApiAdminApproveAccountRoute: ApiAdminApproveAccountRoute,
   ApiAdminPendingAccountsRoute: ApiAdminPendingAccountsRoute,
   ApiAuthLoginRoute: ApiAuthLoginRoute,
@@ -414,6 +518,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBackboardSessionRoute: ApiBackboardSessionRoute,
   ApiGemmaAnalyzeImageRoute: ApiGemmaAnalyzeImageRoute,
   ApiGemmaSummarizeVoiceRoute: ApiGemmaSummarizeVoiceRoute,
+  ApiGemmaTriageRoute: ApiGemmaTriageRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

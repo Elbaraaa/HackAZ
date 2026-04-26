@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AppShell, BloomyLogo, StatusPill, TopBar } from "@/components/AppShell";
+import { AppShell, BloomyLogo, TopBar } from "@/components/AppShell";
 import { Activity, AlertTriangle, Bug, ChevronRight, Gift, Heart, MapPin, Sparkles, Users } from "lucide-react";
 import { activeSignals, useStore } from "@/lib/store";
 import { InteractiveRegionMap } from "@/components/InteractiveRegionMap";
@@ -32,7 +32,7 @@ function Index() {
 
   return (
     <AppShell>
-      <TopBar title="Bloomy" pill={<StatusPill tone="live">AI Surveillance Active</StatusPill>} right={
+      <TopBar title="Bloomy" right={
         <div className="flex items-center gap-2">
           <AuthStatus />
           <Link to="/insights" className="w-9 h-9 rounded-full bg-gradient-teal grid place-items-center text-teal-foreground shadow-glow">

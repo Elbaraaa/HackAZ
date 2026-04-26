@@ -9,6 +9,11 @@ import { nitro } from "nitro/vite";
 
 export default defineConfig({
   cloudflare: false,
+  vite: {
+    server: {
+      allowedHosts: [".ngrok-free.app", "f273-150-135-165-9.ngrok-free.app"],
+    },
+  },
   plugins: [
     nitro({
       preset: "vercel",

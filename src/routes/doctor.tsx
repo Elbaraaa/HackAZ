@@ -332,7 +332,7 @@ function ReviewHub() {
 }
 
 function defaultReport(action: "monitor" | "resolved" | "dismissed") {
-  if (action === "monitor") return "Case reviewed. Symptoms may be contagious; keep on live map for continued surveillance.";
+  if (action === "monitor") return "Case reviewed. Symptoms may be contagious; keep on the live map for continued follow-up.";
   if (action === "resolved") return "Patient or region appears recovered and non-contagious. Removed from live outbreak map.";
   return "Reviewed as non-actionable or duplicate signal. Removed from live outbreak map.";
 }

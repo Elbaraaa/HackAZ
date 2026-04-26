@@ -304,6 +304,43 @@ export async function approvePendingAccount(email: string, approvedBy: string) {
   return profile;
 }
 
+export async function updateSessionProfile(
+  request: Request,
+  input: Partial<Pick<AppUserProfile,
+    "name" | "age" | "sex" | "occupation" | "postalCode" | "phoneNumber" |
+    "householdMemberId" | "physicalLocation" | "locationType" | "organization"
+  >>,
+) {
+  await ensureAuthSchemaOnce();
+  const current = await getSessionProfile(request);
+  if (!current) {
+    throw new Error("You need to be signed in to update your profile.");
+  }
+
+  const sql = getSql();
+  await sql`
+    UPDATE bloomy_users
+    SET
+      name = ${input.name?.trim() || current.name || "Bloomy user"},
+      age = ${input.age ?? current.age ?? null},
+      sex = ${input.sex ?? current.sex ?? "prefer-not-to-say"},
+      occupation = ${input.occupation?.trim() || current.occupation || "Community member"},
+      postal_code = ${input.postalCode?.trim() || current.postalCode || "85719"},
+      phone_number = ${input.phoneNumber?.trim() || current.phoneNumber || ""},
+      household_member_id = ${input.householdMemberId?.trim() || current.householdMemberId || ""},
+      physical_location = ${input.physicalLocation?.trim() || current.physicalLocation || ""},
+      location_type = ${input.locationType ?? current.locationType ?? "home"},
+      organization = ${input.organization?.trim() || current.organization || null}
+    WHERE id = ${current.id}
+  `;
+
+  const rows = await sql`SELECT * FROM bloomy_users WHERE id = ${current.id} LIMIT 1`;
+  const profile = rows[0] ? rowToProfile(rows[0]) : current;
+  if (profile.role === "patient") await ensurePatientProfile(profile);
+  if (profile.role === "doctor" || profile.role === "environmental") await ensureDoctorProfile(profile);
+  return profile;
+}
+
 export function sessionCookie(sessionId: string, expiresAt: Date) {
   return serializeCookie(SESSION_COOKIE, sessionId, {
     httpOnly: true,

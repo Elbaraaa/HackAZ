@@ -445,6 +445,53 @@ export function upsertLocalUserProfile(user: {
   return profile;
 }
 
+export function updateLocalUserProfile(
+  userId: string,
+  input: Partial<Pick<AppUserProfile,
+    "name" | "age" | "sex" | "occupation" | "postalCode" | "phoneNumber" |
+    "householdMemberId" | "physicalLocation" | "locationType" | "organization"
+  >>,
+): AppUserProfile {
+  const state = seedAccounts(readState());
+  const current = state.users[userId];
+  if (!current) {
+    throw new Error("Could not find your profile.");
+  }
+
+  const next: AppUserProfile = {
+    ...current,
+    ...input,
+    name: input.name?.trim() || current.name,
+    occupation: input.occupation?.trim() || current.occupation,
+    postalCode: input.postalCode?.trim() || current.postalCode,
+    phoneNumber: input.phoneNumber?.trim() || current.phoneNumber,
+    householdMemberId: input.householdMemberId?.trim() || current.householdMemberId,
+    physicalLocation: input.physicalLocation?.trim() || current.physicalLocation,
+    organization: input.organization?.trim() ?? current.organization,
+  };
+
+  state.users[userId] = next;
+  const account = next.email ? state.accounts[accountKey(next.email)] : undefined;
+  if (account) {
+    state.accounts[accountKey(next.email)] = {
+      ...account,
+      name: next.name ?? account.name,
+      age: next.age ?? account.age,
+      sex: next.sex ?? account.sex,
+      occupation: next.occupation ?? account.occupation,
+      postalCode: next.postalCode ?? account.postalCode,
+      phoneNumber: next.phoneNumber ?? account.phoneNumber,
+      householdMemberId: next.householdMemberId ?? account.householdMemberId,
+      physicalLocation: next.physicalLocation ?? account.physicalLocation,
+      locationType: next.locationType ?? account.locationType,
+      organization: next.organization ?? account.organization,
+    };
+  }
+
+  writeState(state);
+  return next;
+}
+
 export function saveBackboardThread(userId: string, threadId: string) {
   const state = readState();
   const user = state.users[userId];
