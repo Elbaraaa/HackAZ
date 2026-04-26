@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Activity, Gift, Map as MapIcon, Stethoscope, Home, Shield, UserRound } from "lucide-react";
+import { Activity, FileText, Gift, Map as MapIcon, Stethoscope, Home, Shield, UserRound } from "lucide-react";
 import { type ReactNode, useEffect, useId } from "react";
 import { useAppUser } from "@/hooks/use-app-user";
 import { store, type ServerHealthCheckIn } from "@/lib/store";
@@ -8,6 +8,7 @@ const tabs = [
   { to: "/", label: "Home", icon: Home },
   { to: "/checkin", label: "Check-In", icon: Activity },
   { to: "/map", label: "Map", icon: MapIcon },
+  { to: "/weekly-report", label: "Weekly", icon: FileText },
   { to: "/rewards", label: "Rewards", icon: Gift },
   { to: "/doctor", label: "Review", icon: Stethoscope },
   { to: "/admin", label: "Admin", icon: Shield },

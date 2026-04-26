@@ -31,6 +31,7 @@ export const Route = createFileRoute("/api/checkins")({
           const body = (await request.json()) as Partial<HealthCheckInInput>;
           const checkIn = await saveHealthCheckIn({
             userId: body.userId || "demo-user",
+            zip: body.zip,
             feeling: normalizeFeeling(body.feeling),
             symptoms: Array.isArray(body.symptoms) ? body.symptoms.map(String) : [],
             duration: body.duration,

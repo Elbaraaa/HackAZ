@@ -131,6 +131,7 @@ export type State = {
 export type ServerHealthCheckIn = {
   id: string;
   userId: string;
+  zip?: string;
   feeling: "good" | "sick" | "unsure";
   symptoms: string[];
   duration?: string;
@@ -363,13 +364,14 @@ function checkInFromServer(input: ServerHealthCheckIn): CheckIn {
   const feeling = feelingFromServer(input.feeling);
   const { symptoms, otherSymptom } = symptomsFromServer(input);
   const vitals = simulateVitals(feeling);
-  const risk = computeRisk({ feeling, symptoms, vitals, zip: state.zip });
+  const zip = input.zip ?? state.zip;
+  const risk = computeRisk({ feeling, symptoms, vitals, zip });
 
   return {
     id: input.id,
     reporterUserId: input.userId,
     date: input.createdAt,
-    zip: state.zip,
+    zip,
     feeling,
     symptoms,
     setting: "home",

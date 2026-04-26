@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WeeklyReportRouteImport } from './routes/weekly-report'
 import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as ReportRouteImport } from './routes/report'
 import { Route as PublicHealthRouteImport } from './routes/public-health'
@@ -34,6 +35,11 @@ import { Route as ApiAdminUsersRouteImport } from './routes/api/admin.users'
 import { Route as ApiAdminPendingAccountsRouteImport } from './routes/api/admin.pending-accounts'
 import { Route as ApiAdminApproveAccountRouteImport } from './routes/api/admin.approve-account'
 
+const WeeklyReportRoute = WeeklyReportRouteImport.update({
+  id: '/weekly-report',
+  path: '/weekly-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RewardsRoute = RewardsRouteImport.update({
   id: '/rewards',
   path: '/rewards',
@@ -166,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/rewards': typeof RewardsRoute
+  '/weekly-report': typeof WeeklyReportRoute
   '/api/alexa': typeof ApiAlexaRoute
   '/api/checkins': typeof ApiCheckinsRoute
   '/api/profile': typeof ApiProfileRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/rewards': typeof RewardsRoute
+  '/weekly-report': typeof WeeklyReportRoute
   '/api/alexa': typeof ApiAlexaRoute
   '/api/checkins': typeof ApiCheckinsRoute
   '/api/profile': typeof ApiProfileRoute
@@ -219,6 +227,7 @@ export interface FileRoutesById {
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/rewards': typeof RewardsRoute
+  '/weekly-report': typeof WeeklyReportRoute
   '/api/alexa': typeof ApiAlexaRoute
   '/api/checkins': typeof ApiCheckinsRoute
   '/api/profile': typeof ApiProfileRoute
@@ -247,6 +256,7 @@ export interface FileRouteTypes {
     | '/public-health'
     | '/report'
     | '/rewards'
+    | '/weekly-report'
     | '/api/alexa'
     | '/api/checkins'
     | '/api/profile'
@@ -273,6 +283,7 @@ export interface FileRouteTypes {
     | '/public-health'
     | '/report'
     | '/rewards'
+    | '/weekly-report'
     | '/api/alexa'
     | '/api/checkins'
     | '/api/profile'
@@ -299,6 +310,7 @@ export interface FileRouteTypes {
     | '/public-health'
     | '/report'
     | '/rewards'
+    | '/weekly-report'
     | '/api/alexa'
     | '/api/checkins'
     | '/api/profile'
@@ -326,6 +338,7 @@ export interface RootRouteChildren {
   PublicHealthRoute: typeof PublicHealthRoute
   ReportRoute: typeof ReportRoute
   RewardsRoute: typeof RewardsRoute
+  WeeklyReportRoute: typeof WeeklyReportRoute
   ApiAlexaRoute: typeof ApiAlexaRoute
   ApiCheckinsRoute: typeof ApiCheckinsRoute
   ApiProfileRoute: typeof ApiProfileRoute
@@ -344,6 +357,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/weekly-report': {
+      id: '/weekly-report'
+      path: '/weekly-report'
+      fullPath: '/weekly-report'
+      preLoaderRoute: typeof WeeklyReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rewards': {
       id: '/rewards'
       path: '/rewards'
@@ -526,6 +546,7 @@ const rootRouteChildren: RootRouteChildren = {
   PublicHealthRoute: PublicHealthRoute,
   ReportRoute: ReportRoute,
   RewardsRoute: RewardsRoute,
+  WeeklyReportRoute: WeeklyReportRoute,
   ApiAlexaRoute: ApiAlexaRoute,
   ApiCheckinsRoute: ApiCheckinsRoute,
   ApiProfileRoute: ApiProfileRoute,
