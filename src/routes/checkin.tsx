@@ -9,7 +9,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/checkin")({
   head: () => ({
     meta: [
-      { title: "Daily Signal — OutbreakIQ" },
+      { title: "Daily Signal - Bloomy" },
       { name: "description", content: "Log your current health status to help track community anomalies." },
     ],
   }),
@@ -75,7 +75,7 @@ function CheckIn() {
 
   return (
     <AppShell>
-      <TopBar title="Clinical Intel" back="/" pill={<StatusPill tone="live">Secure</StatusPill>} />
+      <TopBar title="Bloomy" back="/" pill={<StatusPill tone="live">Secure</StatusPill>} />
 
       <section className="px-5 pt-3">
         <h1 className="text-3xl font-extrabold tracking-tight text-navy">Daily Signal</h1>

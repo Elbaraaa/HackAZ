@@ -11,7 +11,7 @@ export const Route = createFileRoute("/insights")({
   }),
   head: () => ({
     meta: [
-      { title: "Insight — OutbreakIQ" },
+      { title: "Insight - Bloomy" },
       { name: "description", content: "Personalized AI-assisted triage and community insights." },
     ],
   }),
@@ -100,7 +100,7 @@ function Insights() {
       <section className="px-5 mt-6 rounded-2xl bg-surface border border-border p-4">
         <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Disclaimer</p>
         <p className="mt-1 text-[12px] text-muted-foreground leading-relaxed">
-          OutbreakIQ provides AI-assisted triage based on community signals — this is a possible signal, not a diagnosis. Always consult a licensed clinician.
+          Bloomy provides AI-assisted triage based on community signals - this is a possible signal, not a diagnosis. Always consult a licensed clinician.
         </p>
       </section>
     </AppShell>

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { useEffect, useRef, useState } from "react";
-import { Camera, Mic, Wifi, WifiOff, AlertTriangle, ShieldAlert, FileText, Send, LocateFixed, X, Square } from "lucide-react";
+import { Camera, Mic, Wifi, WifiOff, AlertTriangle, ShieldAlert, FileText, Send, LocateFixed, X, Square, LoaderCircle, Sparkles } from "lucide-react";
 import { store, type AnimalIncident, type RiskLevel } from "@/lib/store";
 import { requestApproxLocation, type ApproxLocation } from "@/lib/location";
 import { analyzeIncidentImageWithGemma, summarizeVoiceNoteWithGemma } from "@/lib/gemma";
@@ -38,7 +38,7 @@ declare global {
 export const Route = createFileRoute("/report")({
   head: () => ({
     meta: [
-      { title: "Report Animal Incident — OutbreakIQ" },
+      { title: "Report Animal Incident - Bloomy" },
       { name: "description", content: "Report animal incidents — farmers and veterinarians." },
     ],
   }),
@@ -72,6 +72,7 @@ function Report() {
   const [photoFile, setPhotoFile] = useState<File | undefined>();
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | undefined>();
   const [photoAnalysis, setPhotoAnalysis] = useState("");
+  const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceSummary, setVoiceSummary] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -85,6 +86,7 @@ function Report() {
     if (!photoFile) {
       setPhotoPreviewUrl(undefined);
       setPhotoAnalysis("");
+      setIsAnalyzingPhoto(false);
       return;
     }
 
@@ -101,8 +103,14 @@ function Report() {
     if (!photoFile) return;
 
     let cancelled = false;
+    setPhotoAnalysis("");
+    setIsAnalyzingPhoto(true);
     analyzeIncidentImageWithGemma(photoFile, { incident, species }).then((analysis) => {
       if (!cancelled) setPhotoAnalysis(analysis);
+    }).catch(() => {
+      if (!cancelled) toast.error("Gemma could not read the photo right now");
+    }).finally(() => {
+      if (!cancelled) setIsAnalyzingPhoto(false);
     });
 
     return () => {
@@ -196,7 +204,7 @@ function Report() {
 
   return (
     <AppShell>
-      <TopBar title="Clinical Intel" back="/" pill={<StatusPill tone={offline ? "warn" : "live"}>{offline ? "Offline" : "12% sync"}</StatusPill>} right={
+      <TopBar title="Bloomy" back="/" pill={<StatusPill tone={offline ? "warn" : "live"}>{offline ? "Offline" : "12% sync"}</StatusPill>} right={
         <button onClick={() => setOffline(o => !o)} className="w-9 h-9 rounded-full grid place-items-center bg-muted">
           {offline ? <WifiOff className="w-4 h-4"/> : <Wifi className="w-4 h-4 text-teal"/>}
         </button>
@@ -256,12 +264,8 @@ function Report() {
             </div>
           ) : null}
         </label>
-        {photoAnalysis ? (
-          <div className="mt-2 rounded-xl border border-teal/20 bg-teal/5 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-teal">Gemma Image Analysis</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-navy">{photoAnalysis}</p>
-          </div>
-        ) : null}
+        {isAnalyzingPhoto ? <ImageAnalysisLoading /> : null}
+        {!isAnalyzingPhoto && photoAnalysis ? <ImageAnalysisCard analysis={photoAnalysis} /> : null}
       </section>
 
       <section className="px-5 mt-5">
@@ -310,10 +314,19 @@ function Report() {
               type="button"
               onClick={summarizeVoiceNote}
               disabled={isSummarizing}
-              className="mt-3 w-full rounded-lg bg-teal px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-70"
+              className="mt-3 w-full rounded-lg bg-teal px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-80 flex items-center justify-center gap-2"
             >
-              {isSummarizing ? "Summarizing..." : "Summarize with Gemma"}
+              {isSummarizing ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : null}
+              {isSummarizing ? "Generating summary..." : "Summarize with Gemma"}
             </button>
+            {isSummarizing ? (
+              <div className="mt-2 rounded-lg border border-teal/20 bg-teal/5 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-teal/25 border-t-teal" />
+                  <p className="text-[12px] font-semibold text-navy">Gemma is turning the voice note into a concise vet summary.</p>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
         {voiceSummary ? (
@@ -407,6 +420,88 @@ function fileToDataUrl(file: File) {
     reader.onerror = () => reject(new Error("Could not read image"));
     reader.readAsDataURL(file);
   });
+}
+
+function ImageAnalysisLoading() {
+  return (
+    <div className="mt-2 rounded-xl border border-teal/20 bg-teal/5 p-3">
+      <div className="flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-teal/10 text-teal">
+          <LoaderCircle className="h-4 w-4 animate-spin" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[12px] font-bold text-navy">Gemma is reading the photo</p>
+          <p className="text-[11px] text-muted-foreground">Checking visible signs and likely next steps.</p>
+        </div>
+      </div>
+      <div className="mt-3 space-y-1.5">
+        <span className="block h-2 w-11/12 animate-pulse rounded-full bg-teal/15" />
+        <span className="block h-2 w-8/12 animate-pulse rounded-full bg-teal/15" />
+        <span className="block h-2 w-9/12 animate-pulse rounded-full bg-teal/15" />
+      </div>
+    </div>
+  );
+}
+
+function ImageAnalysisCard({ analysis }: { analysis: string }) {
+  const sections = sectionAnalysisText(analysis);
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-xl border border-teal/20 bg-teal/5">
+      <div className="flex items-center gap-2 border-b border-teal/15 px-3 py-2.5">
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-teal/10 text-teal">
+          <Sparkles className="h-3.5 w-3.5" />
+        </span>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-teal">Gemma Image Analysis</p>
+          <p className="text-[11px] text-muted-foreground">AI-assisted, not a diagnosis</p>
+        </div>
+      </div>
+
+      <div className="space-y-3 p-3">
+        <div>
+          <p className="text-[11px] font-bold text-navy">What Gemma noticed</p>
+          <ul className="mt-1 space-y-1.5">
+            {sections.observations.map((item) => (
+              <li key={item} className="flex items-start gap-2 text-[12px] leading-relaxed text-navy">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {sections.nextSteps.length ? (
+          <div className="rounded-lg bg-white/70 p-2.5">
+            <p className="text-[11px] font-bold text-navy">Suggested next steps</p>
+            <ul className="mt-1 space-y-1.5">
+              {sections.nextSteps.map((item) => (
+                <li key={item} className="flex items-start gap-2 text-[12px] leading-relaxed text-navy">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function sectionAnalysisText(analysis: string) {
+  const chunks = analysis
+    .split(/\n+|(?<=[.!?])\s+/)
+    .map((item) => item.replace(/^[-*\d.)\s]+/, "").trim())
+    .filter(Boolean);
+
+  if (chunks.length <= 1) return { observations: [analysis], nextSteps: [] };
+
+  const nextStepIndex = chunks.findIndex((item) => /next steps?|contact|isolate|gloves|avoid|follow-up|veterinarian/i.test(item));
+  const observations = (nextStepIndex > 0 ? chunks.slice(0, nextStepIndex) : chunks.slice(0, 2)).slice(0, 3);
+  const nextSteps = (nextStepIndex > 0 ? chunks.slice(nextStepIndex) : chunks.slice(observations.length)).slice(0, 5);
+
+  return { observations, nextSteps };
 }
 
 function computeTriage(incident: AnimalIncident["incident"], species: AnimalIncident["species"]) {

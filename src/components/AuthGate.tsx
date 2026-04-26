@@ -1,7 +1,8 @@
-import { Activity, LogIn, UserPlus } from "lucide-react";
+import { LogIn, UserPlus } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { isAuthConfigured } from "@/lib/auth-config";
 import { useAppUser } from "@/hooks/use-app-user";
+import { BloomyLogo } from "@/components/AppShell";
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading, loginWithRedirect } = useAppUser();
@@ -29,11 +30,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return (
       <main className="min-h-screen bg-background px-5 py-8">
         <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center">
-          <div className="mb-8 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-teal text-teal-foreground shadow-glow">
-            <Activity className="h-7 w-7" />
-          </div>
+          <BloomyLogo className="mb-8 h-16 w-16" />
 
-          <p className="text-[11px] font-bold uppercase tracking-widest text-teal">OutbreakIQ</p>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-teal">Bloomy</p>
           <h1 className="mt-3 text-[40px] font-extrabold leading-[1.02] tracking-tight text-navy">
             Sign in to continue.
           </h1>

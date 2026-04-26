@@ -106,7 +106,7 @@ export function upsertUserProfile(user: {
       userAuth0Sub: user.sub,
       displayName: user.name || "Clinical reviewer",
       specialty: "Family medicine",
-      organization: "OutbreakIQ Partner Network",
+      organization: "Bloomy Partner Network",
       verified: true,
     };
     next.doctorProfileId = id;
@@ -157,4 +157,3 @@ export function getAdminAnalyticsSnapshot(activeSignals: number): AdminAnalytics
     highRiskClusters: 0,
   };
 }
-

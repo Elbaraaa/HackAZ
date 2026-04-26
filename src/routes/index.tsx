@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
+import { AppShell, BloomyLogo, StatusPill, TopBar } from "@/components/AppShell";
 import { Activity, AlertTriangle, Bug, ChevronRight, Heart, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { activeSignals, useStore } from "@/lib/store";
 import { InteractiveRegionMap } from "@/components/InteractiveRegionMap";
@@ -8,9 +8,9 @@ import { useMemo } from "react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "OutbreakIQ — Early Outbreak Intelligence" },
+      { title: "Bloomy - Early Health Intelligence" },
       { name: "description", content: "Turn everyday health signals into early outbreak warnings." },
-      { property: "og:title", content: "OutbreakIQ" },
+      { property: "og:title", content: "Bloomy" },
       { property: "og:description", content: "Participatory outbreak intelligence platform." },
     ],
   }),
@@ -28,13 +28,20 @@ function Index() {
 
   return (
     <AppShell>
-      <TopBar title="OutbreakIQ" pill={<StatusPill tone="live">AI Surveillance Active</StatusPill>} right={
+      <TopBar title="Bloomy" pill={<StatusPill tone="live">AI Surveillance Active</StatusPill>} right={
         <Link to="/insights" className="w-9 h-9 rounded-full bg-gradient-teal grid place-items-center text-teal-foreground shadow-glow">
           <Sparkles className="w-4 h-4" />
         </Link>
       }/>
 
       <section className="px-5 pt-4 pb-6">
+        <div className="mb-4 flex items-center gap-3">
+          <BloomyLogo className="h-14 w-14 shrink-0" />
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-teal">Bloomy</p>
+            <p className="text-[12px] font-semibold text-muted-foreground">Community health signals</p>
+          </div>
+        </div>
         <h1 className="text-[34px] leading-[1.05] font-extrabold tracking-tight text-navy">
           Turn everyday<br/>health signals<br/>into early<br/>outbreak warnings.
         </h1>
@@ -147,7 +154,7 @@ function MiniMap() {
       <circle cx="120" cy="55" r="6" fill="oklch(0.62 0.22 25)" />
       <circle cx="120" cy="55" r="10" fill="none" stroke="oklch(0.62 0.22 25)" strokeOpacity="0.6"/>
       <circle cx="220" cy="70" r="5" fill="oklch(0.78 0.16 75)" />
-      <text x="120" y="96" textAnchor="middle" fontSize="9" fill="white" fontWeight="700">Outbreak</text>
+      <text x="120" y="96" textAnchor="middle" fontSize="9" fill="white" fontWeight="700">Cluster</text>
       <text x="220" y="100" textAnchor="middle" fontSize="9" fill="white" fontWeight="700">Mosquito Risk</text>
     </svg>
   );

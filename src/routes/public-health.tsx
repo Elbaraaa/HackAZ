@@ -7,7 +7,7 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recha
 export const Route = createFileRoute("/public-health")({
   head: () => ({
     meta: [
-      { title: "Public Health — OutbreakIQ" },
+      { title: "Public Health - Bloomy" },
       { name: "description", content: "Explainable risk scores by area, with model card and oversight." },
     ],
   }),
@@ -39,7 +39,7 @@ function PublicHealth() {
       <TopBar title="Public Health" back="/doctor" pill={<StatusPill tone="live">Region: Pima County</StatusPill>}/>
 
       <section className="px-5 pt-2">
-        <h1 className="text-3xl font-extrabold tracking-tight text-navy">Outbreak Intelligence</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight text-navy">Health Intelligence</h1>
         <p className="text-[13px] text-muted-foreground mt-1">Explainable risk by ZIP — with full source breakdown and model oversight.</p>
       </section>
 

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/doctor")({
   head: () => ({
     meta: [
-      { title: "Doctor Dashboard - OutbreakIQ" },
+      { title: "Doctor Dashboard - Bloomy" },
       { name: "description", content: "Validate community alerts with one tap." },
     ],
   }),
@@ -37,13 +37,13 @@ function Doctor() {
 
   const decide = (id: string, action: "monitor" | "resolved" | "dismissed", contagious: boolean) => {
     const summary = reports[id]?.trim() || defaultReport(action);
-    store.doctorReviewSignal(id, { action, contagious, summary, reviewer: "Dr. Sentinel" });
+    store.doctorReviewSignal(id, { action, contagious, summary, reviewer: "Dr. Bloomy" });
     toast.success(action === "monitor" ? "Case note saved" : "Case removed from live map");
   };
 
   return (
     <AppShell>
-      <TopBar title="Clinical Intel" back="/" pill={<StatusPill tone="live">Doctor Mode</StatusPill>} right={
+      <TopBar title="Bloomy" back="/" pill={<StatusPill tone="live">Doctor Mode</StatusPill>} right={
         <button className="w-9 h-9 rounded-full grid place-items-center bg-muted relative">
           <Bell className="w-4 h-4"/>
           {highRisk ? <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger"/> : null}

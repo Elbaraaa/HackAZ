@@ -17,6 +17,8 @@ import { Route as DoctorRouteImport } from './routes/doctor'
 import { Route as CheckinRouteImport } from './routes/checkin'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiGemmaSummarizeVoiceRouteImport } from './routes/api/gemma.summarize-voice'
+import { Route as ApiGemmaAnalyzeImageRouteImport } from './routes/api/gemma.analyze-image'
 import { Route as ApiBackboardSessionRouteImport } from './routes/api/backboard.session'
 
 const ReportRoute = ReportRouteImport.update({
@@ -59,6 +61,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGemmaSummarizeVoiceRoute = ApiGemmaSummarizeVoiceRouteImport.update({
+  id: '/api/gemma/summarize-voice',
+  path: '/api/gemma/summarize-voice',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGemmaAnalyzeImageRoute = ApiGemmaAnalyzeImageRouteImport.update({
+  id: '/api/gemma/analyze-image',
+  path: '/api/gemma/analyze-image',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBackboardSessionRoute = ApiBackboardSessionRouteImport.update({
   id: '/api/backboard/session',
   path: '/api/backboard/session',
@@ -75,6 +87,8 @@ export interface FileRoutesByFullPath {
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/api/backboard/session': typeof ApiBackboardSessionRoute
+  '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
+  '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +100,8 @@ export interface FileRoutesByTo {
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/api/backboard/session': typeof ApiBackboardSessionRoute
+  '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
+  '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +114,8 @@ export interface FileRoutesById {
   '/public-health': typeof PublicHealthRoute
   '/report': typeof ReportRoute
   '/api/backboard/session': typeof ApiBackboardSessionRoute
+  '/api/gemma/analyze-image': typeof ApiGemmaAnalyzeImageRoute
+  '/api/gemma/summarize-voice': typeof ApiGemmaSummarizeVoiceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +129,8 @@ export interface FileRouteTypes {
     | '/public-health'
     | '/report'
     | '/api/backboard/session'
+    | '/api/gemma/analyze-image'
+    | '/api/gemma/summarize-voice'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +142,8 @@ export interface FileRouteTypes {
     | '/public-health'
     | '/report'
     | '/api/backboard/session'
+    | '/api/gemma/analyze-image'
+    | '/api/gemma/summarize-voice'
   id:
     | '__root__'
     | '/'
@@ -133,6 +155,8 @@ export interface FileRouteTypes {
     | '/public-health'
     | '/report'
     | '/api/backboard/session'
+    | '/api/gemma/analyze-image'
+    | '/api/gemma/summarize-voice'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +169,8 @@ export interface RootRouteChildren {
   PublicHealthRoute: typeof PublicHealthRoute
   ReportRoute: typeof ReportRoute
   ApiBackboardSessionRoute: typeof ApiBackboardSessionRoute
+  ApiGemmaAnalyzeImageRoute: typeof ApiGemmaAnalyzeImageRoute
+  ApiGemmaSummarizeVoiceRoute: typeof ApiGemmaSummarizeVoiceRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -205,6 +231,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/gemma/summarize-voice': {
+      id: '/api/gemma/summarize-voice'
+      path: '/api/gemma/summarize-voice'
+      fullPath: '/api/gemma/summarize-voice'
+      preLoaderRoute: typeof ApiGemmaSummarizeVoiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gemma/analyze-image': {
+      id: '/api/gemma/analyze-image'
+      path: '/api/gemma/analyze-image'
+      fullPath: '/api/gemma/analyze-image'
+      preLoaderRoute: typeof ApiGemmaAnalyzeImageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/backboard/session': {
       id: '/api/backboard/session'
       path: '/api/backboard/session'
@@ -225,6 +265,8 @@ const rootRouteChildren: RootRouteChildren = {
   PublicHealthRoute: PublicHealthRoute,
   ReportRoute: ReportRoute,
   ApiBackboardSessionRoute: ApiBackboardSessionRoute,
+  ApiGemmaAnalyzeImageRoute: ApiGemmaAnalyzeImageRoute,
+  ApiGemmaSummarizeVoiceRoute: ApiGemmaSummarizeVoiceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

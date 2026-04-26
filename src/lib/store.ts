@@ -1,4 +1,4 @@
-// Lightweight global store for OutbreakIQ demo state - no backend yet.
+// Lightweight global store for Bloomy demo state - no backend yet.
 import { useSyncExternalStore } from "react";
 import type { ApproxLocation } from "@/lib/location";
 

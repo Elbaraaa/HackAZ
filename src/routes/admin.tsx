@@ -8,7 +8,7 @@ import { Activity, ShieldAlert, Stethoscope, Users } from "lucide-react";
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Admin Analytics — OutbreakIQ" },
+      { title: "Admin Analytics - Bloomy" },
       { name: "description", content: "Administrative analytics and role management." },
     ],
   }),
@@ -100,4 +100,3 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
     </div>
   );
 }
-

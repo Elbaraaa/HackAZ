@@ -8,7 +8,7 @@ import { AlertTriangle, Bug, Droplets, Flame, Heart, Hospital } from "lucide-rea
 export const Route = createFileRoute("/map")({
   head: () => ({
     meta: [
-      { title: "Community Map - OutbreakIQ" },
+      { title: "Community Map - Bloomy" },
       { name: "description", content: "Live community signals, clusters, and environmental risks." },
     ],
   }),
@@ -49,7 +49,7 @@ function MapView() {
 
   return (
     <AppShell>
-      <TopBar title="Clinical Intel" back="/" pill={<StatusPill tone="live">Live</StatusPill>} />
+      <TopBar title="Bloomy" back="/" pill={<StatusPill tone="live">Live</StatusPill>} />
 
       <section className="relative h-[calc(100vh-8.25rem)] min-h-[620px] overflow-hidden bg-navy">
         {TOKEN ? (
