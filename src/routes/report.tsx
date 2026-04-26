@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { useState } from "react";
-import { Camera, Mic, Wifi, WifiOff, ChevronRight, AlertTriangle, ShieldAlert, FileText, Send } from "lucide-react";
+import { Camera, Mic, Wifi, WifiOff, AlertTriangle, ShieldAlert, FileText, Send, LocateFixed } from "lucide-react";
 import { store, type AnimalIncident, type RiskLevel } from "@/lib/store";
+import { requestApproxLocation, type ApproxLocation } from "@/lib/location";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/report")({
@@ -39,8 +40,23 @@ function Report() {
   const [zip, setZip] = useState("85629");
   const [offline, setOffline] = useState(false);
   const [hasPhoto, setHasPhoto] = useState(false);
+  const [approxLocation, setApproxLocation] = useState<ApproxLocation | undefined>();
+  const [locating, setLocating] = useState(false);
 
   const triage = computeTriage(incident, species);
+
+  const captureLocation = async () => {
+    setLocating(true);
+    try {
+      const location = await requestApproxLocation();
+      setApproxLocation(location);
+      toast.success("Approximate location added");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not get location");
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const submit = () => {
     const ai: AnimalIncident = {
@@ -48,6 +64,7 @@ function Report() {
       date: new Date().toISOString(),
       zip, species, incident, notes,
       urgency: triage.urgency,
+      approxLocation,
     };
     store.addIncident(ai);
     toast.success(offline ? "Saved offline — will sync when connected" : "Shared with VetLink Network");
@@ -113,6 +130,20 @@ function Report() {
         </button>
         <textarea value={notes} onChange={(e)=>setNotes(e.target.value)} rows={3} placeholder="Add notes about behavior, location, time observed…" className="mt-2 w-full rounded-xl bg-card border border-border p-3 text-[13px] focus:outline-none focus:border-teal"/>
         <input value={zip} onChange={(e)=>setZip(e.target.value.replace(/\D/g,"").slice(0,5))} className="mt-2 w-full rounded-xl bg-card border border-border p-3 text-[13px] font-semibold text-navy focus:outline-none focus:border-teal" placeholder="ZIP" inputMode="numeric"/>
+        <button
+          type="button"
+          onClick={captureLocation}
+          disabled={locating}
+          className={`mt-2 w-full flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-[13px] font-semibold ${
+            approxLocation ? "border-success bg-success/5 text-success" : "border-border bg-card text-navy"
+          } disabled:opacity-70`}
+        >
+          <LocateFixed className="w-4 h-4" />
+          {locating ? "Getting location..." : approxLocation ? "Approximate Location Added" : "Use Approximate Location"}
+        </button>
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          {approxLocation ? `Map point blurred within about ${approxLocation.privacyRadiusMiles.toFixed(1)} mi.` : "ZIP is used if location is off."}
+        </p>
       </section>
 
       <section className="px-5 mt-5">

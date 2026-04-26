@@ -202,7 +202,7 @@ function clusterSignals(signals: CommunitySignal[]): SignalCluster[] {
     const closest = clusters
       .filter((cluster) => cluster.type === signal.type || cluster.illness === signal.illness)
       .map((cluster) => ({ cluster, distance: distanceMiles(cluster.longitude, cluster.latitude, signal.longitude, signal.latitude) }))
-      .filter(({ distance }) => distance <= mergeDistanceMiles(signal))
+      .filter(({ cluster, distance }) => distance <= mergeDistanceMiles(cluster, signal))
       .sort((a, b) => a.distance - b.distance)[0]?.cluster;
 
     if (!closest) {
@@ -228,7 +228,7 @@ function clusterSignals(signals: CommunitySignal[]): SignalCluster[] {
     closest.latitude = ((closest.latitude * closest.count) + (signal.latitude * reportCount)) / totalCount;
     closest.count = totalCount;
     closest.ids.push(signal.id);
-    closest.rank = Math.max(closest.rank, signal.rank + Math.min(totalCount * 5, 24));
+    closest.rank = Math.max(closest.rank, signal.rank) + Math.min(Math.sqrt(totalCount) * 4, 18);
     closest.severity = severityFromRank(closest.rank);
     closest.color = colorFromRank(closest.rank);
   }
@@ -240,17 +240,21 @@ function clusterSignals(signals: CommunitySignal[]): SignalCluster[] {
   }));
 }
 
-function mergeDistanceMiles(signal: CommunitySignal) {
-  if (signal.type === "animal") return 2.2;
-  if (signal.type === "mosquito" || signal.type === "heat") return 3.2;
-  return 1.8;
+function mergeDistanceMiles(cluster: SignalCluster, signal: CommunitySignal) {
+  const base =
+    signal.type === "animal" ? 0.9 :
+    signal.type === "mosquito" || signal.type === "heat" ? 1.15 :
+    0.72;
+  const densityBoost = Math.min(Math.sqrt(cluster.count) * 0.16, 0.58);
+  return base + densityBoost;
 }
 
 function radiusMilesForCluster(cluster: SignalCluster) {
-  const singleBase = cluster.type === "animal" || cluster.type === "mosquito" ? 0.95 : 0.65;
-  const spreadBoost = Math.sqrt(Math.max(cluster.count - 1, 0)) * 0.55;
-  const riskBoost = cluster.rank >= 78 ? 0.95 : cluster.rank >= 55 ? 0.45 : 0;
-  return Number(Math.min(6.5, singleBase + spreadBoost + riskBoost).toFixed(1));
+  const singleBase = cluster.type === "animal" || cluster.type === "mosquito" ? 0.5 : 0.38;
+  const densityBoost = Math.sqrt(Math.max(cluster.count - 1, 0)) * 0.28;
+  const riskBoost = cluster.rank >= 78 ? 0.45 : cluster.rank >= 55 ? 0.22 : 0;
+  const maxRadius = cluster.type === "mosquito" || cluster.type === "heat" ? 3.6 : 2.8;
+  return Number(Math.min(maxRadius, singleBase + densityBoost + riskBoost).toFixed(2));
 }
 
 function severityFromRank(rank: number): CommunitySignal["severity"] {
@@ -298,20 +302,10 @@ function markerColor(signal: CommunitySignal) {
 }
 
 function colorFromRank(rank: number) {
-  if (rank >= 78) return "d84a3a";
-  if (rank >= 55) return "e57f22";
-  if (rank >= 32) return "d99a00";
-  return "31a46c";
-}
-
-function oldMarkerColor(signal: CommunitySignal) {
-  if (signal.type === "clinic") return "2f91a3";
-  if (signal.type === "healthy-report") return "31a46c";
-  if (signal.type === "mosquito") return "2aa79b";
-  if (signal.type === "heat") return "d99a00";
-  if (signal.severity === "high") return "d84a3a";
-  if (signal.severity === "moderate") return "d99a00";
-  return "31a46c";
+  if (rank >= 82) return "c7352f";
+  if (rank >= 68) return "d84a3a";
+  if (rank >= 50) return "e57f22";
+  return "e0b72f";
 }
 
 function toRadians(value: number) {

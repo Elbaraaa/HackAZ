@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
 import { useState } from "react";
-import { Activity, AlertTriangle, Heart, HelpCircle, Moon, ChevronRight } from "lucide-react";
+import { Activity, AlertTriangle, Heart, HelpCircle, ChevronRight, LocateFixed } from "lucide-react";
 import { computeRisk, simulateVitals, store, type CheckIn, type Symptom } from "@/lib/store";
+import { requestApproxLocation, type ApproxLocation } from "@/lib/location";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/checkin")({
@@ -33,10 +34,25 @@ function CheckIn() {
   const [otherSymptom, setOtherSymptom] = useState("");
   const [zip, setZip] = useState("85719");
   const [setting, setSetting] = useState<CheckIn["setting"]>("workplace");
+  const [approxLocation, setApproxLocation] = useState<ApproxLocation | undefined>();
+  const [locating, setLocating] = useState(false);
   const vitals = simulateVitals(feeling);
 
   const toggleSym = (s: Symptom) =>
     setSymptoms((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+
+  const captureLocation = async () => {
+    setLocating(true);
+    try {
+      const location = await requestApproxLocation();
+      setApproxLocation(location);
+      toast.success("Approximate location added");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not get location");
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const submit = () => {
     const r = computeRisk({ feeling, symptoms, vitals, zip });
@@ -50,6 +66,7 @@ function CheckIn() {
       otherSymptom: symptoms.includes("other") ? otherSymptom.trim() : undefined,
       vitals,
       risk: r.level,
+      approxLocation,
     };
     store.addCheckIn(ci);
     toast.success("Signal submitted — generating AI insight…");
@@ -142,6 +159,20 @@ function CheckIn() {
           className="mt-1.5 w-full rounded-xl bg-card border border-border px-4 py-3 text-[15px] font-semibold text-navy focus:outline-none focus:border-teal"
           inputMode="numeric"
         />
+        <button
+          type="button"
+          onClick={captureLocation}
+          disabled={locating}
+          className={`mt-2 w-full flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-[13px] font-semibold ${
+            approxLocation ? "border-success bg-success/5 text-success" : "border-border bg-card text-navy"
+          } disabled:opacity-70`}
+        >
+          <LocateFixed className="w-4 h-4" />
+          {locating ? "Getting location..." : approxLocation ? "Approximate Location Added" : "Use Approximate Location"}
+        </button>
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          {approxLocation ? `Map point blurred within about ${approxLocation.privacyRadiusMiles.toFixed(1)} mi.` : "ZIP is used if location is off."}
+        </p>
         <p className="mt-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Primary setting today</p>
         <div className="mt-2 grid grid-cols-4 gap-2">
           {(["workplace", "home", "campus", "travel"] as const).map((opt) => (

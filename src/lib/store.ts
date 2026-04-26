@@ -1,5 +1,6 @@
 // Lightweight global store for OutbreakIQ demo state - no backend yet.
 import { useSyncExternalStore } from "react";
+import type { ApproxLocation } from "@/lib/location";
 
 export type Symptom =
   | "fever" | "cough" | "fatigue" | "headache"
@@ -27,6 +28,7 @@ export type CheckIn = {
     activityDropPct: number;
   };
   risk: RiskLevel;
+  approxLocation?: ApproxLocation;
 };
 
 export type AnimalIncident = {
@@ -37,6 +39,7 @@ export type AnimalIncident = {
   incident: "dead" | "sudden-sickness" | "unusual-behavior" | "multiple-affected";
   notes: string;
   urgency: RiskLevel;
+  approxLocation?: ApproxLocation;
 };
 
 export type DoctorReport = {
@@ -62,6 +65,8 @@ export type CommunitySignal = {
   status: CaseStatus;
   longitude: number;
   latitude: number;
+  locationSource?: "zip" | "device";
+  locationAccuracyMiles?: number;
   // pseudo coords for the SVG fallback map (0-100 in a 320x240 viewBox)
   x: number;
   y: number;
@@ -90,16 +95,62 @@ const ZIP_LOCATIONS: Record<string, { longitude: number; latitude: number; x: nu
   "85629": { longitude: -110.9298, latitude: 31.9557, x: 50, y: 80 },
 };
 
-function locationFor(zip: string) {
+function locationFor(zip: string, seed = zip) {
   const known = ZIP_LOCATIONS[zip];
-  if (known) return known;
+  const base = known ?? fallbackLocationForZip(zip);
+  const offset = seed === zip ? { longitude: 0, latitude: 0, x: 0, y: 0 } : offsetForSeed(`${zip}-${seed}`);
 
   return {
-    longitude: -110.96 + (Math.random() - 0.5) * 0.16,
-    latitude: 32.18 + (Math.random() - 0.5) * 0.16,
-    x: 42 + Math.random() * 24,
-    y: 36 + Math.random() * 28,
+    longitude: base.longitude + offset.longitude,
+    latitude: base.latitude + offset.latitude,
+    x: base.x + offset.x,
+    y: base.y + offset.y,
   };
+}
+
+function fallbackPointFor(longitude: number, latitude: number) {
+  return {
+    x: clamp(50 + (longitude + 110.95) * 135, 4, 96),
+    y: clamp(48 - (latitude - 32.18) * 135, 4, 66),
+  };
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function fallbackLocationForZip(zip: string) {
+  const a = normalizedHash(`${zip}-lng`);
+  const b = normalizedHash(`${zip}-lat`);
+  return {
+    longitude: -110.96 + (a - 0.5) * 0.16,
+    latitude: 32.18 + (b - 0.5) * 0.16,
+    x: 42 + a * 24,
+    y: 36 + b * 28,
+  };
+}
+
+function offsetForSeed(seed: string) {
+  const angle = normalizedHash(`${seed}-angle`) * Math.PI * 2;
+  const radius = Math.sqrt(normalizedHash(`${seed}-radius`));
+  const miles = 0.22 + radius * 0.72;
+  const latitudeMiles = 69;
+  const longitudeMiles = latitudeMiles * Math.cos(32.18 * Math.PI / 180);
+  return {
+    longitude: Math.cos(angle) * miles / longitudeMiles,
+    latitude: Math.sin(angle) * miles / latitudeMiles,
+    x: Math.cos(angle) * miles * 1.8,
+    y: Math.sin(angle) * miles * 1.8,
+  };
+}
+
+function normalizedHash(value: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
 }
 
 function expiresFor(severity: RiskLevel, type: CommunitySignal["type"]) {
@@ -124,7 +175,7 @@ function rankFor(input: {
 }
 
 function signal(input: Omit<CommunitySignal, "rank" | "createdAt" | "expiresAt" | "status" | "longitude" | "latitude"> & Partial<Pick<CommunitySignal, "createdAt" | "expiresAt" | "status" | "longitude" | "latitude">>): CommunitySignal {
-  const loc = locationFor(input.zip);
+  const loc = locationFor(input.zip, input.id);
   const createdAt = input.createdAt ?? new Date(now).toISOString();
   return {
     ...input,
@@ -236,13 +287,17 @@ export const store = {
     };
 
     if (c.feeling === "symptoms" && c.symptoms.length) {
-      const loc = locationFor(c.zip);
+      const id = `c-${Date.now()}`;
+      const loc = locationFor(c.zip, id);
+      const devicePoint = c.approxLocation
+        ? fallbackPointFor(c.approxLocation.longitude, c.approxLocation.latitude)
+        : undefined;
       const illness = illnessFromSymptoms(c.symptoms);
       const symptomText = c.symptoms.map((symptom) =>
         symptom === "other" && c.otherSymptom ? `other: ${c.otherSymptom}` : symptom,
       );
       const newSig = signal({
-        id: `c-${Date.now()}`,
+        id,
         zip: c.zip,
         type: "symptom-cluster",
         illness,
@@ -250,10 +305,12 @@ export const store = {
         detail: `${c.symptoms.length} symptom(s): ${symptomText.join(", ")}.`,
         ago: "just now",
         severity: initialSignalSeverity(c.risk, 1),
-        x: loc.x + (Math.random() - 0.5) * 18,
-        y: loc.y + (Math.random() - 0.5) * 18,
-        longitude: loc.longitude + (Math.random() - 0.5) * 0.08,
-        latitude: loc.latitude + (Math.random() - 0.5) * 0.08,
+        x: devicePoint?.x ?? loc.x,
+        y: devicePoint?.y ?? loc.y,
+        longitude: c.approxLocation?.longitude ?? loc.longitude,
+        latitude: c.approxLocation?.latitude ?? loc.latitude,
+        locationSource: c.approxLocation ? "device" : "zip",
+        locationAccuracyMiles: c.approxLocation?.privacyRadiusMiles,
         count: 1,
       });
       state = { ...state, signals: [newSig, ...state.signals] };
@@ -270,9 +327,13 @@ export const store = {
     emit();
   },
   addIncident: (i: AnimalIncident) => {
-    const loc = locationFor(i.zip);
+    const id = `i-${Date.now()}`;
+    const loc = locationFor(i.zip, id);
+    const devicePoint = i.approxLocation
+      ? fallbackPointFor(i.approxLocation.longitude, i.approxLocation.latitude)
+      : undefined;
     const sig = signal({
-      id: `i-${Date.now()}`,
+      id,
       zip: i.zip,
       type: "animal",
       illness: "zoonotic",
@@ -280,10 +341,12 @@ export const store = {
       detail: i.notes || "Awaiting veterinary review via VetLink Network.",
       ago: "just now",
       severity: initialSignalSeverity(i.urgency, 1),
-      x: loc.x + (Math.random() - 0.5) * 18,
-      y: loc.y + (Math.random() - 0.5) * 18,
-      longitude: loc.longitude + (Math.random() - 0.5) * 0.08,
-      latitude: loc.latitude + (Math.random() - 0.5) * 0.08,
+      x: devicePoint?.x ?? loc.x,
+      y: devicePoint?.y ?? loc.y,
+      longitude: i.approxLocation?.longitude ?? loc.longitude,
+      latitude: i.approxLocation?.latitude ?? loc.latitude,
+      locationSource: i.approxLocation ? "device" : "zip",
+      locationAccuracyMiles: i.approxLocation?.privacyRadiusMiles,
       count: 1,
     });
     state = {
