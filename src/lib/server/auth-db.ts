@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import type { AccountRecord, AppRole, AppUserProfile, LocationType, Sex, SignupProfileInput } from "@/lib/app-data";
+import type { AccountRecord, AppRole, AppUserProfile, LocationType, ReviewLane, Sex, SignupProfileInput } from "@/lib/app-data";
 
 const scrypt = promisify(scryptCallback);
 const SESSION_COOKIE = "bloomy_session";
@@ -41,6 +41,7 @@ export async function ensureAuthSchema() {
       location_type TEXT NOT NULL,
       organization TEXT,
       approval_note TEXT,
+      review_lane TEXT,
       workspace_id TEXT NOT NULL,
       doctor_profile_id TEXT,
       patient_profile_id TEXT,
@@ -50,6 +51,7 @@ export async function ensureAuthSchema() {
       created_at TEXT NOT NULL
     )
   `;
+  await sql`ALTER TABLE bloomy_users ADD COLUMN IF NOT EXISTS review_lane TEXT`;
   await sql`
     CREATE TABLE IF NOT EXISTS bloomy_sessions (
       id TEXT PRIMARY KEY,
@@ -116,6 +118,25 @@ async function seedSystemAccounts(sql: SqlClient) {
       physicalLocation: "Bloomy Review Clinic, Tucson, AZ",
       locationType: "clinic",
       organization: "Bloomy Review Clinic",
+      reviewLane: "clinical",
+    },
+    {
+      role: "doctor",
+      name: "Veterinary reviewer",
+      email: "vet@bloomy.local",
+      password: "bloomy123",
+      age: 39,
+      sex: "prefer-not-to-say",
+      uniqueId: "vet-demo",
+      occupation: "Veterinarian",
+      dateOfReport: new Date().toISOString().slice(0, 10),
+      postalCode: "85629",
+      phoneNumber: "555-0215",
+      householdMemberId: "VET-001",
+      physicalLocation: "Bloomy Veterinary Network, Tucson, AZ",
+      locationType: "clinic",
+      organization: "Bloomy Veterinary Network",
+      reviewLane: "veterinary",
     },
     {
       role: "environmental",
@@ -185,14 +206,15 @@ async function insertUser(sql: SqlClient, input: SignupProfileInput, options?: {
       INSERT INTO bloomy_users (
         id, email, password_hash, name, role, status, age, sex, unique_id, occupation,
         date_of_report, postal_code, phone_number, household_member_id, physical_location,
-        location_type, organization, approval_note, workspace_id, doctor_profile_id,
+        location_type, organization, approval_note, review_lane, workspace_id, doctor_profile_id,
         patient_profile_id, approved_at, approved_by, created_at
       ) VALUES (
         ${id}, ${normalizeEmail(input.email)}, ${passwordHash}, ${input.name.trim()}, ${input.role},
         ${status}, ${input.age || null}, ${input.sex}, ${input.uniqueId.trim()}, ${input.occupation.trim()},
         ${input.dateOfReport}, ${input.postalCode.trim()}, ${input.phoneNumber.trim()},
         ${input.householdMemberId.trim()}, ${input.physicalLocation.trim()}, ${input.locationType},
-        ${input.organization?.trim() || null}, ${input.approvalNote?.trim() || null}, ${workspaceId},
+        ${input.organization?.trim() || null}, ${input.approvalNote?.trim() || null},
+        ${input.reviewLane ?? defaultReviewLane(input)}, ${workspaceId},
         ${doctorProfileId}, ${patientProfileId}, ${status === "approved" ? now : null},
         ${status === "approved" ? options?.approvedBy ?? "self-service" : null}, ${now}
       )
@@ -215,7 +237,7 @@ async function insertUser(sql: SqlClient, input: SignupProfileInput, options?: {
   return profile;
 }
 
-export async function authenticateUser(input: { role: AppRole; email: string; password: string }) {
+export async function authenticateUser(input: { role: AppRole; email: string; password: string; reviewLane?: ReviewLane }) {
   await ensureAuthSchemaOnce();
   const sql = getSql();
   const rows = await sql`SELECT * FROM bloomy_users WHERE email = ${normalizeEmail(input.email)} LIMIT 1`;
@@ -225,6 +247,9 @@ export async function authenticateUser(input: { role: AppRole; email: string; pa
   }
   if (row.role !== input.role) {
     throw new Error("This account belongs to a different workspace.");
+  }
+  if (input.reviewLane && defaultReviewLane({ role: row.role, occupation: row.occupation, uniqueId: row.unique_id, reviewLane: row.review_lane }) !== input.reviewLane) {
+    throw new Error("This account belongs to a different review portal.");
   }
   if (row.status !== "approved") {
     throw new Error("This account is waiting for admin approval.");
@@ -418,6 +443,7 @@ function rowToProfile(row: any): AppUserProfile {
     organization: row.organization ?? undefined,
     approvalNote: row.approval_note ?? undefined,
     approvalStatus: row.status,
+    reviewLane: row.review_lane ?? undefined,
   };
 }
 
@@ -440,6 +466,7 @@ function rowToAccountRecord(row: any): AccountRecord {
     locationType: row.location_type as LocationType,
     organization: row.organization ?? undefined,
     approvalNote: row.approval_note ?? undefined,
+    reviewLane: row.review_lane ?? undefined,
     workspaceId: row.workspace_id,
     status: row.status,
     approvedAt: row.approved_at ?? undefined,
@@ -464,7 +491,8 @@ function validateSignup(input: SignupProfileInput) {
   }
 }
 
-function defaultReviewLane(input: { role: AppRole; occupation?: string; uniqueId?: string }) {
+function defaultReviewLane(input: { role: AppRole; occupation?: string; uniqueId?: string; reviewLane?: ReviewLane | null }) {
+  if (input.reviewLane) return input.reviewLane;
   if (input.role === "environmental") return "environmental";
   const haystack = `${input.occupation ?? ""} ${input.uniqueId ?? ""}`.toLowerCase();
   if (haystack.includes("vet") || haystack.includes("animal")) return "veterinary";

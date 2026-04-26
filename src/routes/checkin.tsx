@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AppShell, StatusPill, TopBar } from "@/components/AppShell";
-import { useState } from "react";
-import { Activity, AlertTriangle, Heart, HelpCircle, ChevronRight, Gift, LocateFixed } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Activity, AlertTriangle, Heart, HelpCircle, ChevronRight, Gift, LocateFixed, Sparkles } from "lucide-react";
 import { computeRisk, simulateVitals, store, type CheckIn, type Symptom } from "@/lib/store";
 import { requestApproxLocation, type ApproxLocation } from "@/lib/location";
 import { rewardAudience } from "@/lib/rewards";
@@ -52,14 +52,31 @@ function CheckIn() {
   const [locating, setLocating] = useState(false);
   const hasSymptomDetails = symptoms.length > 0 || otherSymptom.trim().length > 0;
   const vitals = simulateVitals(feeling === "symptoms" && !hasSymptomDetails ? "unsure" : feeling);
+  const localRisk = computeRisk({ feeling, symptoms: feeling === "symptoms" ? symptoms : [], vitals, zip });
   const activeReward = rewardAudience(feeling === "symptoms" ? "symptom" : "healthy");
-  const symptomTriage = analyzeSymptoms({
+  const fallbackTriage = analyzeSymptoms({
     feeling,
     symptoms: feeling === "symptoms" ? symptoms : [],
     vitals,
     zip,
     otherSymptom,
   });
+  const { triage: gemmaTriage, loading: gemmaTriageLoading, error: gemmaTriageError } = useGemmaSymptomTriage({
+    enabled: feeling === "symptoms" && hasSymptomDetails,
+    fallbackTriage,
+    feeling,
+    symptoms,
+    otherSymptom,
+    zip,
+    vitals,
+    factors: localRisk.factors,
+    followUps: [
+      absentFromWork ? "Absent from work" : "",
+      absentFromSchool ? "Absent from school" : "",
+      soughtCare ? "Sought health care or treatment" : "",
+    ].filter(Boolean),
+  });
+  const symptomTriage = gemmaTriage ?? fallbackTriage;
 
   const toggleSym = (s: Symptom) =>
     setSymptoms((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
@@ -189,7 +206,14 @@ function CheckIn() {
               <FollowUpToggle label="Did you seek health care or treatment?" checked={soughtCare} onChange={setSoughtCare} />
             </div>
           </div>
-          {hasSymptomDetails ? <SymptomTriageCard triage={symptomTriage} /> : null}
+          {hasSymptomDetails ? (
+            <SymptomTriageCard
+              triage={symptomTriage}
+              loading={gemmaTriageLoading}
+              error={gemmaTriageError}
+              refinedByGemma={Boolean(gemmaTriage)}
+            />
+          ) : null}
         </section>
       )}
 
@@ -314,7 +338,112 @@ function FollowUpToggle({ label, checked, onChange }: { label: string; checked: 
   );
 }
 
-function SymptomTriageCard({ triage }: { triage: SymptomTriage }) {
+function useGemmaSymptomTriage(input: {
+  enabled: boolean;
+  fallbackTriage: SymptomTriage;
+  feeling: CheckIn["feeling"];
+  symptoms: Symptom[];
+  otherSymptom: string;
+  zip: string;
+  vitals: CheckIn["vitals"];
+  factors: string[];
+  followUps: string[];
+}) {
+  const [triage, setTriage] = useState<SymptomTriage | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const symptomKey = input.symptoms.join("|");
+  const followUpKey = input.followUps.join("|");
+  const vitalsKey = useMemo(() => JSON.stringify(input.vitals), [input.vitals]);
+
+  useEffect(() => {
+    if (!input.enabled) {
+      setTriage(null);
+      setLoading(false);
+      setError("");
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+    setError("");
+    setTriage(null);
+
+    fetch("/api/gemma/triage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        feeling: input.feeling,
+        symptoms: input.symptoms,
+        otherSymptom: input.otherSymptom,
+        riskScore: input.fallbackTriage.urgencyScore,
+        urgencyLabel: input.fallbackTriage.urgencyLabel,
+        zip: input.zip,
+        factors: input.factors,
+        followUps: input.followUps,
+        vitals: input.vitals,
+      }),
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Gemma triage failed.");
+        }
+        return data;
+      })
+      .then((data) => {
+        if (!active || !data) return;
+        setTriage({
+          ...input.fallbackTriage,
+          possibleMatch: data.possibleMatch || input.fallbackTriage.possibleMatch,
+          possibleConditions: data.possibleConditions?.length ? data.possibleConditions : input.fallbackTriage.possibleConditions,
+          urgencyScore: typeof data.urgencyScore === "number" ? data.urgencyScore : input.fallbackTriage.urgencyScore,
+          urgencyLabel: data.urgencyLabel || input.fallbackTriage.urgencyLabel,
+          level: data.level || input.fallbackTriage.level,
+          tone: data.level === "critical" || data.level === "high" ? "danger" : data.level === "moderate" ? "warn" : "ok",
+          summary: data.summary || input.fallbackTriage.summary,
+          nextSteps: data.nextSteps?.length ? data.nextSteps : input.fallbackTriage.nextSteps,
+          redFlags: data.redFlags?.length ? data.redFlags : input.fallbackTriage.redFlags,
+        });
+      })
+      .catch((nextError) => {
+        if (active) setError(nextError instanceof Error ? nextError.message : "Gemma triage failed.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    input.enabled,
+    input.feeling,
+    input.otherSymptom,
+    input.zip,
+    input.fallbackTriage.possibleMatch,
+    input.fallbackTriage.urgencyLabel,
+    input.fallbackTriage.urgencyScore,
+    input.factors.join("|"),
+    symptomKey,
+    followUpKey,
+    vitalsKey,
+  ]);
+
+  return { triage, loading, error };
+}
+
+function SymptomTriageCard({
+  triage,
+  loading,
+  error,
+  refinedByGemma,
+}: {
+  triage: SymptomTriage;
+  loading?: boolean;
+  error?: string;
+  refinedByGemma?: boolean;
+}) {
   const toneClass =
     triage.tone === "danger" ? "border-danger/25 bg-danger/8 text-danger" :
     triage.tone === "warn" ? "border-warning/30 bg-warning/10 text-warning" :
@@ -324,7 +453,9 @@ function SymptomTriageCard({ triage }: { triage: SymptomTriage }) {
     <div className={`mt-4 rounded-2xl border p-4 ${toneClass}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">AI-assisted triage</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">
+            {refinedByGemma ? "Gemma symptom triage" : "Quick symptom triage"}
+          </p>
           <p className="mt-1 text-[15px] font-extrabold text-navy">{triage.possibleMatch}</p>
         </div>
         <div className="shrink-0 text-right">
@@ -334,6 +465,29 @@ function SymptomTriageCard({ triage }: { triage: SymptomTriage }) {
       </div>
       <p className="mt-2 text-[12px] font-bold text-navy">{triage.urgencyLabel}</p>
       <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{triage.summary}</p>
+      {loading ? (
+        <div className="mt-3 flex items-center gap-2 rounded-xl bg-white/70 p-3 text-[12px] font-semibold text-navy">
+          <Sparkles className="h-3.5 w-3.5 animate-pulse text-teal" />
+          Gemma is checking the symptom combo...
+        </div>
+      ) : null}
+      {error ? (
+        <div className="mt-3 rounded-xl border border-warning/30 bg-white/70 p-3 text-[12px] leading-relaxed text-navy">
+          <span className="font-bold text-warning">Gemma unavailable:</span> {error}
+        </div>
+      ) : null}
+      {triage.possibleConditions?.length ? (
+        <div className="mt-3 rounded-xl bg-white/70 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Possible patterns</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {triage.possibleConditions.map((condition) => (
+              <span key={condition} className="rounded-full bg-card px-2.5 py-1 text-[11px] font-semibold text-navy">
+                {condition}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {triage.redFlags.length ? (
         <div className="mt-3 rounded-xl bg-white/70 p-3">
           <p className="text-[10px] font-bold uppercase tracking-wider text-danger">Red flags selected</p>

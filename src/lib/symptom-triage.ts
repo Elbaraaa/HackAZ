@@ -4,6 +4,7 @@ type TriageTone = "ok" | "warn" | "danger";
 
 export type SymptomTriage = {
   possibleMatch: string;
+  possibleConditions?: string[];
   urgencyLabel: string;
   urgencyScore: number;
   level: RiskLevel | "critical";
@@ -23,6 +24,7 @@ export function analyzeSymptoms(input: {
   if (input.feeling === "healthy") {
     return {
       possibleMatch: "Healthy baseline signal",
+      possibleConditions: [],
       urgencyLabel: "No urgent signal",
       urgencyScore: 8,
       level: "low",
@@ -39,6 +41,7 @@ export function analyzeSymptoms(input: {
   if (!input.symptoms.length && !input.otherSymptom?.trim()) {
     return {
       possibleMatch: "No symptom details yet",
+      possibleConditions: [],
       urgencyLabel: "Low - add symptoms to refine",
       urgencyScore: input.feeling === "unsure" ? 12 : 18,
       level: "low",
@@ -56,15 +59,16 @@ export function analyzeSymptoms(input: {
   const risk = computeRisk(input);
   const symptoms = input.symptoms;
   const has = (symptom: Symptom) => symptoms.includes(symptom);
-  const critical = has("difficulty-breathing") || has("bleeding-openings");
-  const urgent = critical || has("yellow-skin-eyes") || has("discolored-bloody-urine");
+  const emergencyRedFlag = has("bleeding-openings");
+  const breathingConcern = has("difficulty-breathing");
+  const urgent = emergencyRedFlag || breathingConcern || has("yellow-skin-eyes") || has("discolored-bloody-urine");
   const giPattern = has("nausea-vomiting") || has("diarrhea") || has("stomach");
   const respiratoryPattern = has("cough") || has("cough-congestion") || has("difficulty-breathing") || has("sore-throat") || has("loss-smell-taste");
   const fluPattern = has("fever") || has("chills") || has("body-aches") || has("fatigue");
   const rashPattern = has("rash") || has("red-eyes");
 
   const possibleMatch =
-    critical && respiratoryPattern ? "Respiratory illness pattern with breathing concern" :
+    breathingConcern && respiratoryPattern ? "Respiratory pattern with breathing concern" :
     has("bleeding-openings") ? "Critical bleeding warning pattern" :
     has("yellow-skin-eyes") ? "Possible liver or jaundice warning pattern" :
     has("discolored-bloody-urine") ? "Possible urinary or kidney warning pattern" :
@@ -76,20 +80,34 @@ export function analyzeSymptoms(input: {
     input.otherSymptom ? "Unusual symptom pattern" :
     "General symptom pattern";
 
-  const urgencyScore = Math.min(100, Math.max(
-    critical ? 86 : urgent ? 72 : 0,
-    risk.score + (critical ? 24 : urgent ? 14 : giPattern && fluPattern ? 8 : 0),
-  ));
+  const possibleConditions = [
+    respiratoryPattern && fluPattern ? "Flu-like illness" : "",
+    respiratoryPattern && !fluPattern ? "Cold, allergies, COVID-like illness, or other respiratory irritation" : "",
+    giPattern ? "Stomach virus, food-related illness, or gastrointestinal irritation" : "",
+    rashPattern && fluPattern ? "Viral rash or other infection-related rash pattern" : "",
+    rashPattern && !fluPattern ? "Skin/eye irritation, allergy, or local inflammation" : "",
+    has("yellow-skin-eyes") ? "Jaundice or liver/bile-related concern" : "",
+    has("discolored-bloody-urine") ? "Urinary tract, kidney, or dehydration-related concern" : "",
+    input.otherSymptom ? `Other reported symptom: ${input.otherSymptom.trim()}` : "",
+  ].filter(Boolean);
+
+  const minimumForRedFlag =
+    emergencyRedFlag ? 78 :
+    breathingConcern ? 68 :
+    has("yellow-skin-eyes") || has("discolored-bloody-urine") ? 58 :
+    0;
+  const comboBoost = respiratoryPattern && fluPattern ? 8 : giPattern && fluPattern ? 7 : symptoms.length >= 4 ? 6 : 0;
+  const urgencyScore = Math.min(95, Math.max(minimumForRedFlag, risk.score + comboBoost));
 
   const level: SymptomTriage["level"] =
-    critical ? "critical" :
-    urgencyScore >= 60 ? "high" :
-    urgencyScore >= 30 ? "moderate" :
+    emergencyRedFlag ? "critical" :
+    urgencyScore >= 70 ? "high" :
+    urgencyScore >= 35 ? "moderate" :
     "low";
 
   const urgencyLabel =
     level === "critical" ? "Critical - seek urgent care now" :
-    level === "high" ? "High - consult a doctor soon" :
+    level === "high" ? "High - get medical advice soon" :
     level === "moderate" ? "Moderate - monitor and consider care" :
     "Low - self-care and monitor";
 
@@ -124,6 +142,7 @@ export function analyzeSymptoms(input: {
 
   return {
     possibleMatch,
+    possibleConditions,
     urgencyLabel,
     urgencyScore,
     level,

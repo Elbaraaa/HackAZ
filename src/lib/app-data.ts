@@ -1,5 +1,6 @@
 export type AppRole = "patient" | "doctor" | "environmental" | "admin";
 export type AccountStatus = "approved" | "pending" | "rejected";
+export type ReviewLane = "clinical" | "veterinary" | "environmental";
 
 export type Sex = "female" | "male" | "intersex" | "prefer-not-to-say" | "other";
 
@@ -22,6 +23,7 @@ export type SignupProfileInput = {
   locationType: LocationType;
   organization?: string;
   approvalNote?: string;
+  reviewLane?: ReviewLane;
 };
 
 export type AccountRecord = Omit<SignupProfileInput, "password" | "dateOfReport"> & {
@@ -57,6 +59,7 @@ export type AppUserProfile = {
   organization?: string;
   approvalNote?: string;
   approvalStatus?: AccountStatus;
+  reviewLane?: ReviewLane;
 };
 
 export type DoctorProfile = {
@@ -66,7 +69,7 @@ export type DoctorProfile = {
   specialty: string;
   organization: string;
   verified: boolean;
-  reviewLane: "clinical" | "veterinary" | "environmental";
+  reviewLane: ReviewLane;
 };
 
 export type PatientProfile = {
@@ -128,7 +131,8 @@ function workspaceFor(role: AppRole, id: string) {
   return `${role}-${cleanId(id)}`;
 }
 
-function defaultReviewLane(input: { role: AppRole; occupation?: string; uniqueId?: string }) {
+function defaultReviewLane(input: { role: AppRole; occupation?: string; uniqueId?: string; reviewLane?: ReviewLane }) {
+  if (input.reviewLane) return input.reviewLane;
   if (input.role === "environmental") return "environmental";
   const haystack = `${input.occupation ?? ""} ${input.uniqueId ?? ""}`.toLowerCase();
   if (haystack.includes("vet") || haystack.includes("animal")) return "veterinary";
@@ -171,6 +175,25 @@ function seedAccounts(state: AppDataState) {
       physicalLocation: "Bloomy Review Clinic, Tucson, AZ",
       locationType: "clinic",
       organization: "Bloomy Review Clinic",
+      reviewLane: "clinical",
+    },
+    {
+      role: "doctor",
+      name: "Veterinary reviewer",
+      email: "vet@bloomy.local",
+      password: "bloomy123",
+      age: 39,
+      sex: "prefer-not-to-say",
+      uniqueId: "vet-demo",
+      occupation: "Veterinarian",
+      dateOfReport: new Date().toISOString().slice(0, 10),
+      postalCode: "85629",
+      phoneNumber: "555-0215",
+      householdMemberId: "VET-001",
+      physicalLocation: "Bloomy Veterinary Network, Tucson, AZ",
+      locationType: "clinic",
+      organization: "Bloomy Veterinary Network",
+      reviewLane: "veterinary",
     },
     {
       role: "environmental",
@@ -263,6 +286,7 @@ function profileFromAccount(account: AccountRecord, existing?: AppUserProfile): 
     organization: account.organization,
     approvalNote: account.approvalNote,
     approvalStatus: account.status,
+    reviewLane: account.reviewLane,
   };
 }
 
@@ -282,6 +306,7 @@ function ensureRoleProfile(state: AppDataState, profile: AppUserProfile) {
         role: next.role,
         occupation: next.occupation,
         uniqueId: next.uniqueId,
+        reviewLane: next.reviewLane,
       }),
     };
     next.doctorProfileId = id;
@@ -294,6 +319,7 @@ function ensureRoleProfile(state: AppDataState, profile: AppUserProfile) {
           role: next.role,
           occupation: next.occupation,
           uniqueId: next.uniqueId,
+          reviewLane: next.reviewLane,
         }),
     };
   }
@@ -362,6 +388,7 @@ export function createLocalAccount(input: SignupProfileInput): AppUserProfile {
     locationType: input.locationType,
     organization: input.organization?.trim(),
     approvalNote: input.approvalNote?.trim(),
+    reviewLane: input.reviewLane ?? defaultReviewLane(input),
     uniqueId: input.uniqueId.trim(),
     occupation: input.occupation.trim(),
     name: input.name.trim(),
@@ -382,6 +409,7 @@ export function authenticateLocalAccount(input: {
   role: AppRole;
   email: string;
   password: string;
+  reviewLane?: ReviewLane;
 }): AppUserProfile {
   const state = seedAccounts(readState());
   const account = state.accounts[accountKey(input.email)];
@@ -394,6 +422,11 @@ export function authenticateLocalAccount(input: {
   if (account.role !== input.role) {
     writeState(state);
     throw new Error("This account belongs to a different workspace.");
+  }
+
+  if (input.reviewLane && defaultReviewLane(account) !== input.reviewLane) {
+    writeState(state);
+    throw new Error("This account belongs to a different review portal.");
   }
 
   if (account.status !== "approved") {
@@ -438,6 +471,7 @@ export function upsertLocalUserProfile(user: {
     organization: account?.organization ?? existing?.organization,
     approvalNote: account?.approvalNote ?? existing?.approvalNote,
     approvalStatus: account?.status ?? existing?.approvalStatus,
+    reviewLane: account?.reviewLane ?? existing?.reviewLane,
   };
 
   const profile = ensureRoleProfile(state, next);
@@ -485,6 +519,7 @@ export function updateLocalUserProfile(
       physicalLocation: next.physicalLocation ?? account.physicalLocation,
       locationType: next.locationType ?? account.locationType,
       organization: next.organization ?? account.organization,
+      reviewLane: next.reviewLane ?? account.reviewLane,
     };
   }
 

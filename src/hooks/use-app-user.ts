@@ -4,6 +4,7 @@ import {
   createLocalAccount,
   type AppRole,
   type AppUserProfile,
+  type ReviewLane,
   type SignupProfileInput,
   updateLocalUserProfile,
   upsertLocalUserProfile,
@@ -111,7 +112,7 @@ export function useAppUser() {
     setProfile((current) => current ?? upsertLocalUserProfile(session));
   }, [isLoading, session]);
 
-  const loginWithCredentials = useCallback(async (input: { role: AppRole; email: string; password: string }) => {
+  const loginWithCredentials = useCallback(async (input: { role: AppRole; email: string; password: string; reviewLane?: ReviewLane }) => {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",

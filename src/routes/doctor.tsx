@@ -49,8 +49,12 @@ function ReviewHub() {
   }, [liveSignals, profile, role]);
 
   useEffect(() => {
-    if (doctorProfile?.reviewLane) setReviewLane(doctorProfile.reviewLane);
-  }, [doctorProfile?.reviewLane]);
+    if (doctorProfile?.reviewLane) {
+      setReviewLane(doctorProfile.reviewLane);
+      return;
+    }
+    if (profile?.reviewLane) setReviewLane(profile.reviewLane);
+  }, [doctorProfile?.reviewLane, profile?.reviewLane]);
 
   const clusters = scopedSignals.filter((s) =>
     reviewLane === "veterinary"
@@ -142,7 +146,7 @@ function ReviewHub() {
         <p className="text-[13px] text-muted-foreground mt-1">
           {role === "admin"
             ? "Admin view can inspect all review queues."
-            : `Signed in as ${doctorProfile?.displayName ?? "reviewer"}. This hub only shows cases assigned to your workspace.`}
+            : `Signed in as ${doctorProfile?.displayName ?? profile?.name ?? "reviewer"}. This hub only shows cases assigned to your workspace.`}
         </p>
       </section>
 

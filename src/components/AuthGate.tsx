@@ -1,12 +1,16 @@
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, MapPin, Shield, Stethoscope, UserRound, Users, Droplets } from "lucide-react";
+import { ArrowLeft, ArrowRight, MapPin, PawPrint, Shield, Stethoscope, UserRound, Users, Droplets } from "lucide-react";
 import { type FormEvent, type InputHTMLAttributes, type ReactNode, useState } from "react";
 import { BloomyLogo } from "@/components/AppShell";
-import { type AppRole, type LocationType, type Sex } from "@/lib/app-data";
+import { type AppRole, type LocationType, type ReviewLane, type Sex } from "@/lib/app-data";
 import { useAppUser } from "@/hooks/use-app-user";
 
+type WorkspaceId = "patient" | "clinical" | "veterinary" | "environmental" | "admin";
+
 const workspaces: Array<{
+  id: WorkspaceId;
   role: AppRole;
+  reviewLane?: ReviewLane;
   title: string;
   label: string;
   description: string;
@@ -14,6 +18,7 @@ const workspaces: Array<{
   icon: typeof UserRound;
 }> = [
   {
+    id: "patient",
     role: "patient",
     title: "Patient",
     label: "Continue as user",
@@ -22,15 +27,29 @@ const workspaces: Array<{
     icon: UserRound,
   },
   {
+    id: "clinical",
     role: "doctor",
-    title: "Doctor",
-    label: "Doctor portal",
-    description: "Review only the cases and queues tied to your reviewer workspace.",
+    reviewLane: "clinical",
+    title: "Clinical",
+    label: "Clinical portal",
+    description: "Review human health signals, symptom clusters, and care follow-up queues.",
     to: "/doctor",
     icon: Stethoscope,
   },
   {
+    id: "veterinary",
+    role: "doctor",
+    reviewLane: "veterinary",
+    title: "Vet",
+    label: "Veterinary portal",
+    description: "Review animal incidents, herd/flock risks, and zoonotic monitoring queues.",
+    to: "/doctor",
+    icon: PawPrint,
+  },
+  {
+    id: "environmental",
     role: "environmental",
+    reviewLane: "environmental",
     title: "Environment",
     label: "Environmental portal",
     description: "Review water, flooding, vector, heat, and local exposure reports.",
@@ -38,6 +57,7 @@ const workspaces: Array<{
     icon: Droplets,
   },
   {
+    id: "admin",
     role: "admin",
     title: "Admin",
     label: "Admin console",
@@ -49,10 +69,11 @@ const workspaces: Array<{
 
 const defaultLogin = {
   patient: "patient@bloomy.local",
-  doctor: "doctor@bloomy.local",
+  clinical: "doctor@bloomy.local",
+  veterinary: "vet@bloomy.local",
   environmental: "environmental@bloomy.local",
   admin: "admin@bloomy.local",
-} satisfies Record<AppRole, string>;
+} satisfies Record<WorkspaceId, string>;
 
 type AuthMode = "choose" | "login" | "signup";
 
@@ -60,7 +81,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading, loginWithCredentials, signup } = useAppUser();
   const [mode, setMode] = useState<AuthMode>("choose");
-  const [selectedRole, setSelectedRole] = useState<AppRole>("patient");
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<WorkspaceId>("patient");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -82,10 +103,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return children;
   }
 
-  const selectedWorkspace = workspaces.find((workspace) => workspace.role === selectedRole)!;
+  const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId)!;
 
-  const selectWorkspace = (role: AppRole) => {
-    setSelectedRole(role);
+  const selectWorkspace = (id: WorkspaceId) => {
+    setSelectedWorkspaceId(id);
     setMode("login");
     setError("");
     setNotice("");
@@ -99,7 +120,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
     try {
       await loginWithCredentials({
-        role: selectedRole,
+        role: selectedWorkspace.role,
+        reviewLane: selectedWorkspace.reviewLane,
         email: String(form.get("email") ?? ""),
         password: String(form.get("password") ?? ""),
       });
@@ -114,11 +136,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setError("");
     setNotice("");
     const form = new FormData(event.currentTarget);
-    const reviewerSignup = selectedRole === "doctor" || selectedRole === "environmental";
+    const reviewerSignup = selectedWorkspace.role === "doctor" || selectedWorkspace.role === "environmental";
 
     try {
       const profile = await signup({
-        role: selectedRole,
+        role: selectedWorkspace.role,
+        reviewLane: selectedWorkspace.reviewLane,
         name: String(form.get("name") ?? ""),
         email: String(form.get("email") ?? ""),
         password: String(form.get("password") ?? ""),
@@ -190,7 +213,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
             </button>
 
             <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1">
-              {(["login", "signup"] as const).filter((item) => selectedRole !== "admin" || item === "login").map((item) => (
+              {(["login", "signup"] as const).filter((item) => selectedWorkspace.role !== "admin" || item === "login").map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -221,9 +244,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
             {mode === "login" ? (
               <form onSubmit={submitLogin} className="space-y-3">
-                <AuthInput name="email" label="Email" type="email" defaultValue={defaultLogin[selectedRole]} />
+                <AuthInput name="email" label="Email" type="email" defaultValue={defaultLogin[selectedWorkspace.id]} />
                 <AuthInput name="password" label="Password" type="password" defaultValue="bloomy123" />
-                {selectedRole === "admin" ? (
+                {selectedWorkspace.role === "admin" ? (
                   <p className="rounded-xl bg-surface p-3 text-[12px] leading-relaxed text-muted-foreground">
                     Admin accounts cannot be created from this public screen. They must be provisioned inside the trusted system.
                   </p>
@@ -235,8 +258,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
               </form>
             ) : (
               <form onSubmit={submitSignup} className="space-y-3">
-                {selectedRole === "doctor" || selectedRole === "environmental" ? (
-                  <ReviewerSignupFields role={selectedRole} />
+                {selectedWorkspace.role === "doctor" || selectedWorkspace.role === "environmental" ? (
+                  <ReviewerSignupFields workspace={selectedWorkspace} />
                 ) : (
                   <>
                 <div className="grid grid-cols-2 gap-2">
@@ -302,7 +325,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 )}
 
                 <button className="flex w-full items-center justify-center gap-2 rounded-2xl bg-navy py-4 text-[13px] font-extrabold text-white shadow-elevated">
-                  {selectedRole === "doctor" || selectedRole === "environmental" ? "Request approval" : "Create account"}
+                  {selectedWorkspace.role === "doctor" || selectedWorkspace.role === "environmental" ? "Request approval" : "Create account"}
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </form>
@@ -314,24 +337,29 @@ export function AuthGate({ children }: { children: ReactNode }) {
   );
 }
 
-function ReviewerSignupFields({ role }: { role: "doctor" | "environmental" }) {
+function ReviewerSignupFields({ workspace }: { workspace: (typeof workspaces)[number] }) {
+  const isEnvironmental = workspace.role === "environmental";
+  const isVeterinary = workspace.reviewLane === "veterinary";
+
   return (
     <>
       <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-[12px] leading-relaxed text-navy">
-        {role === "doctor"
-          ? "Doctor and veterinary reviewer accounts require admin approval before access."
-          : "Environmental health reviewer accounts require admin approval before access."}
+        {isEnvironmental
+          ? "Environmental health reviewer accounts require admin approval before access."
+          : isVeterinary
+          ? "Veterinary reviewer accounts require admin approval before animal case access."
+          : "Clinical reviewer accounts require admin approval before human health case access."}
       </div>
       <div className="grid grid-cols-2 gap-2">
         <AuthInput name="name" label="Full name" required />
-        <AuthInput name="professionalId" label={role === "doctor" ? "License / staff ID" : "Agency / staff ID"} required />
+        <AuthInput name="professionalId" label={isEnvironmental ? "Agency / staff ID" : isVeterinary ? "Vet license / staff ID" : "License / staff ID"} required />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <AuthInput name="email" label="Work email" type="email" required />
         <AuthInput name="password" label="Password" type="password" minLength={6} required />
       </div>
-      <AuthInput name="organization" label={role === "doctor" ? "Clinic / organization" : "Agency / department"} required />
-      <AuthInput name="roleTitle" label={role === "doctor" ? "Clinical role or specialty" : "Environmental role"} required />
+      <AuthInput name="organization" label={isEnvironmental ? "Agency / department" : isVeterinary ? "Veterinary clinic / organization" : "Clinic / organization"} required />
+      <AuthInput name="roleTitle" label={isEnvironmental ? "Environmental role" : isVeterinary ? "Veterinary role or specialty" : "Clinical role or specialty"} required />
       <div className="grid grid-cols-2 gap-2">
         <AuthInput name="phoneNumber" label="Work phone" type="tel" required />
         <AuthInput name="postalCode" label="Service postal code" inputMode="numeric" maxLength={10} required />
@@ -347,14 +375,14 @@ function ReviewerSignupFields({ role }: { role: "doctor" | "environmental" }) {
           <AuthInput
             name="physicalLocation"
             label="Office or service location"
-            placeholder={role === "doctor" ? "Example: Banner Health, Tucson, AZ" : "Example: Pima County Environmental Health"}
+            placeholder={isEnvironmental ? "Example: Pima County Environmental Health" : isVeterinary ? "Example: Bloomy Veterinary Network, Tucson, AZ" : "Example: Banner Health, Tucson, AZ"}
             required
           />
           <label className="block">
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Type of location</span>
             <select
               name="locationType"
-              defaultValue={role === "doctor" ? "clinic" : "workplace"}
+              defaultValue={isEnvironmental ? "workplace" : "clinic"}
               className="mt-1 w-full rounded-xl border border-border bg-card p-3 text-[13px] font-semibold text-navy focus:outline-none focus:border-teal"
             >
               <option value="clinic">Clinic</option>
@@ -378,7 +406,7 @@ function ReviewerSignupFields({ role }: { role: "doctor" | "environmental" }) {
   );
 }
 
-function WorkspaceChooser({ onSelect }: { onSelect: (role: AppRole) => void }) {
+function WorkspaceChooser({ onSelect }: { onSelect: (id: WorkspaceId) => void }) {
   return (
     <section className="space-y-3 bg-background px-4 py-4">
       {workspaces.map((workspace, index) => {
@@ -387,9 +415,9 @@ function WorkspaceChooser({ onSelect }: { onSelect: (role: AppRole) => void }) {
 
         return (
           <button
-            key={workspace.role}
+            key={workspace.id}
             type="button"
-            onClick={() => onSelect(workspace.role)}
+            onClick={() => onSelect(workspace.id)}
             className={`flex w-full items-center gap-3 rounded-2xl border p-4 text-left shadow-soft transition-transform active:scale-[0.99] ${
               primary ? "border-teal/30 bg-gradient-teal text-white" : "border-border bg-card text-navy"
             }`}

@@ -140,6 +140,7 @@ const ZIP_LOCATIONS: Record<string, { longitude: number; latitude: number; x: nu
 };
 
 const DEFAULT_REVIEW_WORKSPACE_ID = "doctor-doctor-demo";
+const DEFAULT_VETERINARY_REVIEW_WORKSPACE_ID = "doctor-vet-demo";
 const DEFAULT_ENVIRONMENTAL_REVIEW_WORKSPACE_ID = "environmental-environmental-demo";
 
 function locationFor(zip: string, seed = zip) {
@@ -240,7 +241,7 @@ const SEED_SIGNALS: CommunitySignal[] = [
   signal({ id: "s2", reviewLane: "environmental", reviewerWorkspaceId: DEFAULT_ENVIRONMENTAL_REVIEW_WORKSPACE_ID, zip: "85705", type: "mosquito", illness: "vector-borne", title: "Mosquito risk elevated due to rainfall", detail: "Recent heavy rainfall combined with rising temperatures has boosted breeding.", ago: "4h", severity: "moderate", x: 62, y: 30, createdAt: new Date(now - hours(4)).toISOString() }),
   signal({ id: "s3", reviewLane: "clinical", reviewerWorkspaceId: DEFAULT_REVIEW_WORKSPACE_ID, zip: "85721", type: "symptom-cluster", illness: "respiratory", title: "Respiratory symptoms up 22% near 85721", detail: "Abnormal resting HR and elevated respiratory rate detected within a 5-mile radius.", ago: "6h", severity: "moderate", x: 24, y: 60, count: 9, createdAt: new Date(now - hours(6)).toISOString() }),
   signal({ id: "s4", reviewLane: "environmental", reviewerWorkspaceId: DEFAULT_ENVIRONMENTAL_REVIEW_WORKSPACE_ID, zip: "85641", type: "heat", illness: "heat", title: "Heat-related symptoms rising near campus", detail: "Hydration warnings active for the next 48h.", ago: "1d", severity: "moderate", x: 70, y: 70, createdAt: new Date(now - hours(24)).toISOString() }),
-  signal({ id: "s5", reviewLane: "veterinary", reviewerWorkspaceId: DEFAULT_REVIEW_WORKSPACE_ID, zip: "85629", type: "animal", illness: "zoonotic", title: "2 animal incidents reported", detail: "Cattle showing sudden sickness - possible zoonotic signal under review.", ago: "1d", severity: "high", x: 50, y: 80, count: 2, createdAt: new Date(now - hours(24)).toISOString() }),
+  signal({ id: "s5", reviewLane: "veterinary", reviewerWorkspaceId: DEFAULT_VETERINARY_REVIEW_WORKSPACE_ID, zip: "85629", type: "animal", illness: "zoonotic", title: "2 animal incidents reported", detail: "Cattle showing sudden sickness - possible zoonotic signal under review.", ago: "1d", severity: "high", x: 50, y: 80, count: 2, createdAt: new Date(now - hours(24)).toISOString() }),
   signal({ id: "s6", zip: "85719", type: "clinic", illness: "baseline", title: "ValleyMed Clinic - walk-in available", detail: "Open until 9pm. CarePoint Telehealth covers after-hours.", ago: "-", severity: "low", x: 44, y: 50 }),
   signal({ id: "s7", zip: "85705", type: "healthy-report", illness: "baseline", title: "412 healthy check-ins this week", detail: "Strong baseline data helping detect anomalies earlier.", ago: "live", severity: "low", x: 56, y: 22 }),
 ];
@@ -394,7 +395,7 @@ export const store = {
       id,
       reporterUserId: context?.reporterUserId ?? i.reporterUserId,
       reviewLane: "veterinary",
-      reviewerWorkspaceId: context?.reviewerWorkspaceId ?? DEFAULT_ENVIRONMENTAL_REVIEW_WORKSPACE_ID,
+      reviewerWorkspaceId: context?.reviewerWorkspaceId ?? DEFAULT_VETERINARY_REVIEW_WORKSPACE_ID,
       zip: i.zip,
       type: "animal",
       illness: "zoonotic",
@@ -437,7 +438,7 @@ export const store = {
       id,
       reporterUserId: context?.reporterUserId ?? i.reporterUserId,
       reviewLane: "environmental",
-      reviewerWorkspaceId: context?.reviewerWorkspaceId ?? DEFAULT_REVIEW_WORKSPACE_ID,
+      reviewerWorkspaceId: context?.reviewerWorkspaceId ?? DEFAULT_ENVIRONMENTAL_REVIEW_WORKSPACE_ID,
       zip: i.zip,
       type: "environmental",
       illness: isVector ? "vector-borne" : i.type === "water-contamination" ? "gastrointestinal" : "baseline",
@@ -487,50 +488,50 @@ export function computeRisk(input: {
   let score = 0;
   const factors: string[] = [];
 
-  if (input.feeling === "symptoms") { score += 25; factors.push("Self-reported symptoms"); }
-  if (input.feeling === "unsure") score += 8;
+  if (input.feeling === "symptoms") { score += 10; factors.push("Self-reported symptoms"); }
+  if (input.feeling === "unsure") score += 5;
 
-  score += input.symptoms.length * 6;
+  score += Math.min(input.symptoms.length * 4, 18);
   if (input.symptoms.includes("fever")) factors.push("Fever reported");
   if (input.symptoms.includes("cough") || input.symptoms.includes("cough-congestion")) factors.push("Cough or congestion reported");
-  if (input.symptoms.includes("difficulty-breathing")) { score += 16; factors.push("Difficulty breathing reported"); }
-  if (input.symptoms.includes("bleeding-openings")) { score += 16; factors.push("Bleeding from body openings reported"); }
-  if (input.symptoms.includes("yellow-skin-eyes")) { score += 10; factors.push("Yellow skin or eyes reported"); }
-  if (input.symptoms.includes("discolored-bloody-urine")) { score += 10; factors.push("Discolored or bloody urine reported"); }
+  if (input.symptoms.includes("difficulty-breathing")) { score += 24; factors.push("Difficulty breathing reported"); }
+  if (input.symptoms.includes("bleeding-openings")) { score += 30; factors.push("Bleeding from body openings reported"); }
+  if (input.symptoms.includes("yellow-skin-eyes")) { score += 18; factors.push("Yellow skin or eyes reported"); }
+  if (input.symptoms.includes("discolored-bloody-urine")) { score += 16; factors.push("Discolored or bloody urine reported"); }
 
   if (input.vitals.hrBaselineDeltaPct > 8) {
-    score += 15;
+    score += 6;
     factors.push(`Resting HR ${input.vitals.hrBaselineDeltaPct}% above baseline`);
   }
   if (input.vitals.sleepDeltaPct < -15) {
-    score += 12;
+    score += 5;
     factors.push(`Sleep quality dropped ${Math.abs(input.vitals.sleepDeltaPct)}%`);
   }
   if (input.vitals.tempDeltaC > 0.4) {
-    score += 10;
+    score += 5;
     factors.push("Skin temperature trending up");
   }
   if (input.vitals.hrv < 35) {
-    score += 8;
+    score += 4;
     factors.push("Reduced HRV / recovery");
   }
 
   const localCluster = activeSignals(store.get().signals).some(
     (s) => s.zip === input.zip && s.type === "symptom-cluster" && s.severity !== "low",
   );
-  if (localCluster) { score += 10; factors.push("Nearby symptom clusters in your ZIP"); }
+  if (localCluster) { score += 5; factors.push("Nearby symptom clusters in your ZIP"); }
 
   const animalNearby = activeSignals(store.get().signals).some(
     (s) => s.zip === input.zip && s.type === "animal",
   );
-  if (animalNearby) { score += 6; factors.push("Recent animal incidents nearby (zoonotic watch)"); }
+  if (animalNearby) { score += 3; factors.push("Recent animal incidents nearby (zoonotic watch)"); }
 
   const mosquitoNearby = activeSignals(store.get().signals).some(
     (s) => s.zip === input.zip && s.type === "mosquito",
   );
-  if (mosquitoNearby) { score += 5; factors.push("Elevated mosquito risk after rainfall"); }
+  if (mosquitoNearby) { score += 3; factors.push("Elevated mosquito risk after rainfall"); }
 
-  const level: RiskLevel = score >= 45 ? "high" : score >= 22 ? "moderate" : "low";
+  const level: RiskLevel = score >= 62 ? "high" : score >= 28 ? "moderate" : "low";
   return { level, score, factors };
 }
 

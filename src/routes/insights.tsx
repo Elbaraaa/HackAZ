@@ -54,7 +54,7 @@ function Insights() {
     zip: checkIn.zip,
     otherSymptom: checkIn.otherSymptom,
   });
-  const gemmaTriage = useGemmaTriage({
+  const { triage: gemmaTriage, loading: gemmaLoading, error: gemmaError } = useGemmaTriage({
     enabled: Boolean(checkIn.symptoms.length || checkIn.otherSymptom),
     feeling: checkIn.feeling,
     symptoms: checkIn.symptoms,
@@ -65,7 +65,18 @@ function Insights() {
     factors: r.factors,
   });
   const displayedTriage = gemmaTriage
-    ? { ...triage, summary: gemmaTriage.summary || triage.summary, nextSteps: gemmaTriage.nextSteps.length ? gemmaTriage.nextSteps : triage.nextSteps }
+    ? {
+        ...triage,
+        possibleMatch: gemmaTriage.possibleMatch || triage.possibleMatch,
+        possibleConditions: gemmaTriage.possibleConditions.length ? gemmaTriage.possibleConditions : triage.possibleConditions,
+        urgencyScore: typeof gemmaTriage.urgencyScore === "number" ? gemmaTriage.urgencyScore : triage.urgencyScore,
+        urgencyLabel: gemmaTriage.urgencyLabel || triage.urgencyLabel,
+        level: gemmaTriage.level || triage.level,
+        tone: gemmaTriage.level === "critical" || gemmaTriage.level === "high" ? "danger" : gemmaTriage.level === "moderate" ? "warn" : triage.tone,
+        summary: gemmaTriage.summary || triage.summary,
+        nextSteps: gemmaTriage.nextSteps.length ? gemmaTriage.nextSteps : triage.nextSteps,
+        redFlags: gemmaTriage.redFlags.length ? gemmaTriage.redFlags : triage.redFlags,
+      } satisfies SymptomTriage
     : triage;
 
   return (
@@ -92,7 +103,7 @@ function Insights() {
       </section>
 
       <section className="px-5 mt-5">
-        <DetailedTriagePanel triage={displayedTriage} refinedByGemma={Boolean(gemmaTriage)} />
+        <DetailedTriagePanel triage={displayedTriage} refinedByGemma={Boolean(gemmaTriage)} loading={gemmaLoading} error={gemmaError} />
       </section>
 
       <section className="px-5 mt-5">
@@ -218,11 +229,6 @@ function HealthyView({ zip, streak, points }: { zip: string; streak: number; poi
         <p className="mt-2 text-[10px] text-center text-muted-foreground">Representative partner for demonstration purposes.</p>
       </section>
 
-      <section className="px-5 mt-6">
-        <Link to="/checkin" className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-navy text-white py-4 font-semibold">
-          Log tomorrow's check-in <ChevronRight className="w-4 h-4" />
-        </Link>
-      </section>
     </AppShell>
   );
 }
@@ -249,39 +255,81 @@ function useGemmaTriage(input: {
   zip: string;
   factors: string[];
 }) {
-  const [triage, setTriage] = useState<{ summary: string; nextSteps: string[] } | null>(null);
+  const [triage, setTriage] = useState<{
+    possibleMatch: string;
+    possibleConditions: string[];
+    urgencyScore?: number;
+    urgencyLabel: string;
+    level?: SymptomTriage["level"];
+    summary: string;
+    nextSteps: string[];
+    redFlags: string[];
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!input.enabled) {
       setTriage(null);
+      setLoading(false);
+      setError("");
       return;
     }
 
     let active = true;
+    setLoading(true);
+    setError("");
     fetch("/api/gemma/triage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     })
-      .then((response) => (response.ok ? response.json() : null))
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Gemma triage failed.");
+        }
+        return data;
+      })
       .then((data) => {
         if (!active || !data?.summary) return;
         setTriage({
+          possibleMatch: data.possibleMatch || "",
+          possibleConditions: Array.isArray(data.possibleConditions) ? data.possibleConditions : [],
+          urgencyScore: typeof data.urgencyScore === "number" ? data.urgencyScore : undefined,
+          urgencyLabel: data.urgencyLabel || "",
+          level: data.level,
           summary: data.summary,
           nextSteps: Array.isArray(data.nextSteps) ? data.nextSteps : [],
+          redFlags: Array.isArray(data.redFlags) ? data.redFlags : [],
         });
       })
-      .catch(() => undefined);
+      .catch((nextError) => {
+        if (active) setError(nextError instanceof Error ? nextError.message : "Gemma triage failed.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
     return () => {
       active = false;
     };
   }, [input.enabled, input.feeling, input.otherSymptom, input.riskScore, input.urgencyLabel, input.zip, input.symptoms.join("|"), input.factors.join("|")]);
 
-  return triage;
+  return { triage, loading, error };
 }
 
-function DetailedTriagePanel({ triage, refinedByGemma = false }: { triage: SymptomTriage; refinedByGemma?: boolean }) {
+function DetailedTriagePanel({
+  triage,
+  refinedByGemma = false,
+  loading = false,
+  error = "",
+}: {
+  triage: SymptomTriage;
+  refinedByGemma?: boolean;
+  loading?: boolean;
+  error?: string;
+}) {
   const toneClass =
     triage.tone === "danger" ? "border-danger/25 bg-danger/8" :
     triage.tone === "warn" ? "border-warning/30 bg-warning/10" :
@@ -303,6 +351,12 @@ function DetailedTriagePanel({ triage, refinedByGemma = false }: { triage: Sympt
           </p>
           <p className="mt-1 text-[15px] font-bold text-navy">{triage.possibleMatch}</p>
           <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{triage.summary}</p>
+          {loading ? (
+            <p className="mt-2 text-[12px] font-semibold text-teal">Gemma is refining this triage...</p>
+          ) : null}
+          {error ? (
+            <p className="mt-2 text-[12px] font-semibold text-warning">Gemma unavailable: {error}</p>
+          ) : null}
         </div>
         <div className="shrink-0 text-right">
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Urgency</p>

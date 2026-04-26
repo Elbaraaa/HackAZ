@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { authenticateUser, createSession, isDatabaseConfigured, sessionCookie } from "@/lib/server/auth-db";
-import type { AppRole } from "@/lib/app-data";
+import type { AppRole, ReviewLane } from "@/lib/app-data";
 
 export const Route = createFileRoute("/api/auth/login")({
   server: {
@@ -11,11 +11,12 @@ export const Route = createFileRoute("/api/auth/login")({
         }
 
         try {
-          const body = (await request.json()) as { role?: AppRole; email?: string; password?: string };
+          const body = (await request.json()) as { role?: AppRole; email?: string; password?: string; reviewLane?: ReviewLane };
           const profile = await authenticateUser({
             role: body.role ?? "patient",
             email: body.email ?? "",
             password: body.password ?? "",
+            reviewLane: body.reviewLane,
           });
           const session = await createSession(profile.id);
 
