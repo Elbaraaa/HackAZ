@@ -43,6 +43,12 @@ export const Route = createFileRoute("/api/gemma/triage")({
             `ZIP/context: ${body.zip ?? "unknown"}`,
           ].filter(Boolean).join("\n");
 
+          console.log("Gemma triage debug:", {
+            hasApiKey: !!apiKey,
+            keyPrefix: apiKey.slice(0, 6),
+            model: GEMMA_MODEL,
+          });
+
           const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMMA_MODEL}:generateContent`, {
             method: "POST",
             headers: {
@@ -56,7 +62,16 @@ export const Route = createFileRoute("/api/gemma/triage")({
 
           const result = await response.json();
           if (!response.ok) {
-            return Response.json({ error: result?.error?.message || "Gemma triage failed" }, { status: response.status });
+            return Response.json(
+              {
+                error: result?.error?.message || "Gemma triage failed",
+                status: response.status,
+                statusText: response.statusText,
+                model: GEMMA_MODEL,
+                raw: result,
+              },
+              { status: response.status }
+            );
           }
 
           return Response.json(parseGemmaJson(extractText(result)));
