@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const GEMMA_MODEL = "gemma-4-31b-it";
+const GEMMA_MODEL = "gemma-4-27b-it";
 
 export const Route = createFileRoute("/api/gemma/triage")({
   server: {
