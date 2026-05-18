@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { saveHealthCheckIn, type HealthCheckInInput } from "@/lib/server/health-checkins";
 
 const DEMO_USER_ID = "demo-user";
-const GEMMA_MODEL = "gemma-3-27b-it";
+const GEMMA_MODEL = "gemma-4-31b-it";
 const FALLBACK_TEXT = "Sorry, I didn't catch that. How are you feeling today?";
 
 type ConversationStep = "ASK_FEELING" | "ASK_SYMPTOMS" | "ASK_IMPACT" | "ASK_GATHERING";
