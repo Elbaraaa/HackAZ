@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { saveHealthCheckIn, type HealthCheckInInput } from "@/lib/server/health-checkins";
+import { geminiGenerateContentUrl, getGeminiApiKey, getGeminiModel, parseJsonObjectText } from "@/lib/server/gemini";
 
 const DEMO_USER_ID = "demo-user";
-const GEMMA_MODEL = "gemma-4-31b-it";
 const FALLBACK_TEXT = "Sorry, I didn't catch that. How are you feeling today?";
 
 type ConversationStep = "ASK_FEELING" | "ASK_SYMPTOMS" | "ASK_IMPACT" | "ASK_GATHERING";
@@ -321,14 +321,16 @@ async function persistCheckIn(checkIn: HealthCheckInInput) {
 }
 
 async function getAiSummary(checkIn: HealthCheckInInput): Promise<{ summary: string; nextSteps: string } | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = getGeminiApiKey();
   if (!apiKey) return null;
+  const model = getGeminiModel();
 
   try {
     const prompt = [
       "You are Bloomy, summarizing a daily health check-in for Alexa.",
       "Do not diagnose. Use summary and next steps language only.",
       "Return compact JSON only with string keys summary and nextSteps.",
+      "Return exactly one valid JSON object. Do not include markdown, code fences, reasoning, notes, or alternate drafts.",
       "Keep nextSteps one short spoken sentence.",
       `Feeling: ${checkIn.feeling}`,
       `Symptoms: ${checkIn.symptoms?.join(", ") || "none reported"}`,
@@ -336,7 +338,7 @@ async function getAiSummary(checkIn: HealthCheckInInput): Promise<{ summary: str
       `Impact: ${checkIn.summary ?? "unknown"}`,
     ].join("\n");
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMMA_MODEL}:generateContent`, {
+    const response = await fetch(geminiGenerateContentUrl(model), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -358,18 +360,15 @@ async function getAiSummary(checkIn: HealthCheckInInput): Promise<{ summary: str
 }
 
 function parseAiJson(text: string) {
-  try {
-    const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
-    const parsed = JSON.parse(cleaned) as { summary?: unknown; nextSteps?: unknown };
-    return {
-      summary: typeof parsed.summary === "string" ? parsed.summary : "",
-      nextSteps: Array.isArray(parsed.nextSteps)
-        ? parsed.nextSteps.filter((step): step is string => typeof step === "string").join(" ")
-        : typeof parsed.nextSteps === "string" ? parsed.nextSteps : "",
-    };
-  } catch {
-    return { summary: "", nextSteps: "" };
-  }
+  const parsed = parseJsonObjectText(text);
+  if (!parsed) return { summary: "", nextSteps: "" };
+
+  return {
+    summary: typeof parsed.summary === "string" ? parsed.summary : "",
+    nextSteps: Array.isArray(parsed.nextSteps)
+      ? parsed.nextSteps.filter((step): step is string => typeof step === "string").join(" ")
+      : typeof parsed.nextSteps === "string" ? parsed.nextSteps : "",
+  };
 }
 
 function extractText(result: any) {

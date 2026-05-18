@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-
-const GEMMA_MODEL = "gemma-4-27b-it";
+import { geminiGenerateContentUrl, getGeminiApiKey, getGeminiModel, parseJsonObjectText } from "@/lib/server/gemini";
 
 export const Route = createFileRoute("/api/gemma/triage")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const apiKey = process.env.GEMINI_API_KEY;
+          const apiKey = getGeminiApiKey();
           if (!apiKey) {
             return Response.json({ error: "GEMINI_API_KEY is not configured" }, { status: 500 });
           }
+          const model = getGeminiModel();
 
           const body = (await request.json()) as {
             feeling?: string;
@@ -32,6 +32,7 @@ export const Route = createFileRoute("/api/gemma/triage")({
             "Urgency score guide: 0-25 mild self-care, 26-45 monitor/consider care, 46-69 medical advice soon, 70-85 urgent care if persistent/severe, 86-100 emergency red flags.",
             "Red flags that can justify high scores: difficulty breathing, bleeding from body openings, confusion/fainting, severe dehydration, blue lips, chest pain, rapidly worsening symptoms, yellow skin/eyes, bloody urine.",
             "Return compact JSON only with keys possibleMatch, possibleConditions, urgencyScore, urgencyLabel, level, summary, nextSteps, redFlags.",
+            "Return exactly one valid JSON object. Do not include markdown, code fences, reasoning, notes, or alternate drafts.",
             "possibleConditions must be 2-4 short strings. nextSteps must be 3 short strings. redFlags must be selected red flags only.",
             `Feeling: ${body.feeling ?? "unknown"}`,
             `Symptoms: ${(body.symptoms ?? []).join(", ") || body.otherSymptom || "none provided"}`,
@@ -43,13 +44,7 @@ export const Route = createFileRoute("/api/gemma/triage")({
             `ZIP/context: ${body.zip ?? "unknown"}`,
           ].filter(Boolean).join("\n");
 
-          console.log("Gemma triage debug:", {
-            hasApiKey: !!apiKey,
-            keyPrefix: apiKey.slice(0, 6),
-            model: GEMMA_MODEL,
-          });
-
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMMA_MODEL}:generateContent`, {
+          const response = await fetch(geminiGenerateContentUrl(model), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -62,16 +57,7 @@ export const Route = createFileRoute("/api/gemma/triage")({
 
           const result = await response.json();
           if (!response.ok) {
-            return Response.json(
-              {
-                error: result?.error?.message || "Gemma triage failed",
-                status: response.status,
-                statusText: response.statusText,
-                model: GEMMA_MODEL,
-                raw: result,
-              },
-              { status: response.status }
-            );
+            return Response.json({ error: result?.error?.message || `Gemma triage failed for ${model}` }, { status: response.status });
           }
 
           return Response.json(parseGemmaJson(extractText(result)));
@@ -110,15 +96,12 @@ function parseGemmaJson(text: string) {
     redFlags?: unknown;
   };
 
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch {
-    parsed = { summary: cleaned, nextSteps: [] };
-  }
+  parsed = parseJsonObjectText(jsonText) ?? { summary: cleaned, nextSteps: [] };
   const urgencyScore = typeof parsed.urgencyScore === "number"
     ? Math.max(0, Math.min(100, Math.round(parsed.urgencyScore)))
     : undefined;
-  const level = ["low", "moderate", "high", "critical"].includes(String(parsed.level)) ? String(parsed.level) : undefined;
+  const parsedLevel = typeof parsed.level === "string" ? parsed.level.toLowerCase() : "";
+  const level = ["low", "moderate", "high", "critical"].includes(parsedLevel) ? parsedLevel : undefined;
 
   return {
     possibleMatch: typeof parsed.possibleMatch === "string" ? parsed.possibleMatch : "",

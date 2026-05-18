@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-
-const GEMMA_MODEL = "gemma-4-31b-it";
+import { geminiGenerateContentUrl, getGeminiApiKey, getGeminiModel } from "@/lib/server/gemini";
 
 export const Route = createFileRoute("/api/gemma/summarize-voice")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const apiKey = process.env.GEMINI_API_KEY;
+          const apiKey = getGeminiApiKey();
           if (!apiKey) {
             return Response.json({ error: "GEMINI_API_KEY is not configured" }, { status: 500 });
           }
+          const model = getGeminiModel();
 
           const body = (await request.json()) as {
             transcript?: string;
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/api/gemma/summarize-voice")({
             "Include important signs or hazards, timing, number affected or vector density, location clues, and immediate next steps if mentioned.",
           ].join("\n");
 
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMMA_MODEL}:generateContent`, {
+          const response = await fetch(geminiGenerateContentUrl(model), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -44,7 +44,7 @@ export const Route = createFileRoute("/api/gemma/summarize-voice")({
 
           const result = await response.json();
           if (!response.ok) {
-            return Response.json({ error: result?.error?.message || "Gemma voice summary failed" }, { status: response.status });
+            return Response.json({ error: result?.error?.message || `Gemma voice summary failed for ${model}` }, { status: response.status });
           }
 
           return Response.json({ summary: cleanGemmaText(extractText(result)) });

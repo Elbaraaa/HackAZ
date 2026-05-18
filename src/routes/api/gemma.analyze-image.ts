@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-
-const GEMMA_MODEL = "gemma-4-31b-it";
+import { geminiGenerateContentUrl, getGeminiApiKey, getGeminiModel } from "@/lib/server/gemini";
 
 export const Route = createFileRoute("/api/gemma/analyze-image")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const apiKey = process.env.GEMINI_API_KEY;
+          const apiKey = getGeminiApiKey();
           if (!apiKey) {
             return Response.json({ error: "GEMINI_API_KEY is not configured" }, { status: 500 });
           }
+          const model = getGeminiModel();
 
           const body = (await request.json()) as {
             imageDataUrl?: string;
@@ -36,7 +36,7 @@ export const Route = createFileRoute("/api/gemma/analyze-image")({
             "Return plain text only. Do not use markdown, headings with #, bold markers, or asterisk bullets.",
           ].filter(Boolean).join("\n");
 
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMMA_MODEL}:generateContent`, {
+          const response = await fetch(geminiGenerateContentUrl(model), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -54,7 +54,7 @@ export const Route = createFileRoute("/api/gemma/analyze-image")({
 
           const result = await response.json();
           if (!response.ok) {
-            return Response.json({ error: result?.error?.message || "Gemma image analysis failed" }, { status: response.status });
+            return Response.json({ error: result?.error?.message || `Gemma image analysis failed for ${model}` }, { status: response.status });
           }
 
           return Response.json({ analysis: cleanGemmaText(extractText(result)) });
